@@ -1,3 +1,7 @@
+import YahooFinance from 'yahoo-finance2'
+
+const yahooFinance = new YahooFinance()
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -7,64 +11,59 @@ export async function GET(request: Request) {
       return Response.json({ error: 'Symbol required' }, { status: 400 })
     }
 
-    const apiKey = process.env.ALPHA_VANTAGE_API_KEY
-    if (!apiKey) {
-      console.error('[v0] Alpha Vantage API key not configured')
-      return Response.json(
-        { error: 'Alpha Vantage API key not configured' },
-        { status: 500 }
-      )
-    }
+    console.log('[Yahoo Finance] Fetching fundamentals for:', symbol)
 
-    const overviewUrl = `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=${apiKey}`
-    console.log('[v0] Fetching fundamentals for:', symbol)
-    
-    const response = await fetch(overviewUrl)
-    const data = await response.json()
+    // Fetch quote summary and key statistics
+    const quoteSummary = await yahooFinance.quoteSummary(symbol, {
+      modules: ['summaryDetail', 'defaultKeyStatistics', 'financialData', 'assetProfile']
+    }, { validateResult: false })
 
-    console.log('[v0] Alpha Vantage response:', { hasSymbol: !!data.Symbol, keys: Object.keys(data).slice(0, 10) })
-
-    if (!data.Symbol) {
-      console.error('[v0] Symbol not found in response:', data)
+    if (!quoteSummary) {
+      console.error('[Yahoo Finance] Symbol not found:', symbol)
       return Response.json({ error: 'Symbol not found' }, { status: 404 })
     }
 
+    const { summaryDetail, defaultKeyStatistics, financialData, assetProfile } = quoteSummary
+
     const fundamentals = {
       // Valuation Ratios
-      peRatio: data['PERatio'] ? parseFloat(data['PERatio']) : null,
-      psRatio: data['PriceToSalesRatioTTM'] ? parseFloat(data['PriceToSalesRatioTTM']) : null,
-      pbRatio: data['PriceToBookRatio'] ? parseFloat(data['PriceToBookRatio']) : null,
-      
+      peRatio: summaryDetail?.trailingPE || defaultKeyStatistics?.trailingEps ?
+        (summaryDetail?.trailingPE || null) : null,
+      psRatio: defaultKeyStatistics?.priceToSalesTrailing12Months || null,
+      pbRatio: defaultKeyStatistics?.priceToBook || null,
+
       // Profitability Metrics
-      eps: data['EPS'] ? parseFloat(data['EPS']) : null,
-      roe: data['ReturnOnEquityTTM'] ? parseFloat(data['ReturnOnEquityTTM']) : null,
-      roic: data['ReturnOnCapitalEmployedTTM'] ? parseFloat(data['ReturnOnCapitalEmployedTTM']) : null,
-      operatingMargin: data['OperatingMarginTTM'] ? parseFloat(data['OperatingMarginTTM']) : null,
-      profitMargin: data['ProfitMargin'] ? parseFloat(data['ProfitMargin']) : null,
-      
+      eps: defaultKeyStatistics?.trailingEps || null,
+      roe: financialData?.returnOnEquity || null,
+      roic: null, // Not directly available in Yahoo Finance
+      operatingMargin: financialData?.operatingMargins || null,
+      profitMargin: financialData?.profitMargins || null,
+
       // Financial Health
-      debtToEquity: data['DebtToEquity'] ? parseFloat(data['DebtToEquity']) : null,
-      currentRatio: data['CurrentRatio'] ? parseFloat(data['CurrentRatio']) : null,
-      quickRatio: data['QuickRatio'] ? parseFloat(data['QuickRatio']) : null,
-      
+      debtToEquity: financialData?.debtToEquity || null,
+      currentRatio: financialData?.currentRatio || null,
+      quickRatio: financialData?.quickRatio || null,
+
       // Growth & Dividend
-      revenueGrowth: data['RevenuePerShareTTM'] ? parseFloat(data['RevenuePerShareTTM']) : null,
-      dividendYield: data['DividendYield'] ? parseFloat(data['DividendYield']) : null,
-      payoutRatio: data['PayoutRatio'] ? parseFloat(data['PayoutRatio']) : null,
-      
+      revenueGrowth: financialData?.revenueGrowth || null,
+      dividendYield: summaryDetail?.dividendYield ? (summaryDetail.dividendYield * 100) : null,
+      payoutRatio: defaultKeyStatistics?.payoutRatio || null,
+
       // Other Metrics
-      marketCap: data['MarketCapitalization'] ? parseInt(data['MarketCapitalization']) : null,
-      bookValue: data['BookValue'] ? parseFloat(data['BookValue']) : null,
-      beta: data['Beta'] ? parseFloat(data['Beta']) : null,
-      week52High: data['52WeekHigh'] ? parseFloat(data['52WeekHigh']) : null,
-      week52Low: data['52WeekLow'] ? parseFloat(data['52WeekLow']) : null,
-      
+      marketCap: summaryDetail?.marketCap || null,
+      bookValue: defaultKeyStatistics?.bookValue || null,
+      beta: defaultKeyStatistics?.beta || null,
+      week52High: summaryDetail?.fiftyTwoWeekHigh || null,
+      week52Low: summaryDetail?.fiftyTwoWeekLow || null,
+
       // Company Info
-      name: data['Name'] || symbol,
-      sector: data['Sector'] || 'N/A',
-      industry: data['Industry'] || 'N/A',
-      description: data['Description'] || 'N/A',
+      name: assetProfile?.longName || symbol,
+      sector: assetProfile?.sector || 'N/A',
+      industry: assetProfile?.industry || 'N/A',
+      description: assetProfile?.longBusinessSummary || 'N/A',
     }
+
+    console.log('[Yahoo Finance] Fundamentals fetched successfully:', symbol)
 
     return Response.json(fundamentals, {
       headers: {
@@ -72,7 +71,7 @@ export async function GET(request: Request) {
       },
     })
   } catch (error) {
-    console.error('[v0] Fundamentals fetch error:', error)
+    console.error('[Yahoo Finance] Fundamentals fetch error:', error)
     return Response.json({ error: 'Failed to fetch fundamentals' }, { status: 500 })
   }
 }
@@ -85,64 +84,59 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Symbol required' }, { status: 400 })
     }
 
-    const apiKey = process.env.ALPHA_VANTAGE_API_KEY
-    if (!apiKey) {
-      console.error('[v0] Alpha Vantage API key not configured')
-      return Response.json(
-        { error: 'Alpha Vantage API key not configured' },
-        { status: 500 }
-      )
-    }
+    console.log('[Yahoo Finance] Fetching fundamentals (POST) for:', symbol)
 
-    const overviewUrl = `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=${apiKey}`
-    console.log('[v0] Fetching fundamentals (POST) for:', symbol)
-    
-    const response = await fetch(overviewUrl)
-    const data = await response.json()
+    // Fetch quote summary and key statistics
+    const quoteSummary = await yahooFinance.quoteSummary(symbol, {
+      modules: ['summaryDetail', 'defaultKeyStatistics', 'financialData', 'assetProfile']
+    })
 
-    console.log('[v0] Alpha Vantage response:', { hasSymbol: !!data.Symbol, keys: Object.keys(data).slice(0, 10) })
-
-    if (!data.Symbol) {
-      console.error('[v0] Symbol not found in response:', data)
+    if (!quoteSummary) {
+      console.error('[Yahoo Finance] Symbol not found:', symbol)
       return Response.json({ error: 'Symbol not found' }, { status: 404 })
     }
 
+    const { summaryDetail, defaultKeyStatistics, financialData, assetProfile } = quoteSummary
+
     const fundamentals = {
       // Valuation Ratios
-      peRatio: data['PERatio'] ? parseFloat(data['PERatio']) : null,
-      psRatio: data['PriceToSalesRatioTTM'] ? parseFloat(data['PriceToSalesRatioTTM']) : null,
-      pbRatio: data['PriceToBookRatio'] ? parseFloat(data['PriceToBookRatio']) : null,
-      
+      peRatio: summaryDetail?.trailingPE || defaultKeyStatistics?.trailingEps ?
+        (summaryDetail?.trailingPE || null) : null,
+      psRatio: defaultKeyStatistics?.priceToSalesTrailing12Months || null,
+      pbRatio: defaultKeyStatistics?.priceToBook || null,
+
       // Profitability Metrics
-      eps: data['EPS'] ? parseFloat(data['EPS']) : null,
-      roe: data['ReturnOnEquityTTM'] ? parseFloat(data['ReturnOnEquityTTM']) : null,
-      roic: data['ReturnOnCapitalEmployedTTM'] ? parseFloat(data['ReturnOnCapitalEmployedTTM']) : null,
-      operatingMargin: data['OperatingMarginTTM'] ? parseFloat(data['OperatingMarginTTM']) : null,
-      profitMargin: data['ProfitMargin'] ? parseFloat(data['ProfitMargin']) : null,
-      
+      eps: defaultKeyStatistics?.trailingEps || null,
+      roe: financialData?.returnOnEquity || null,
+      roic: null, // Not directly available in Yahoo Finance
+      operatingMargin: financialData?.operatingMargins || null,
+      profitMargin: financialData?.profitMargins || null,
+
       // Financial Health
-      debtToEquity: data['DebtToEquity'] ? parseFloat(data['DebtToEquity']) : null,
-      currentRatio: data['CurrentRatio'] ? parseFloat(data['CurrentRatio']) : null,
-      quickRatio: data['QuickRatio'] ? parseFloat(data['QuickRatio']) : null,
-      
+      debtToEquity: financialData?.debtToEquity || null,
+      currentRatio: financialData?.currentRatio || null,
+      quickRatio: financialData?.quickRatio || null,
+
       // Growth & Dividend
-      revenueGrowth: data['RevenuePerShareTTM'] ? parseFloat(data['RevenuePerShareTTM']) : null,
-      dividendYield: data['DividendYield'] ? parseFloat(data['DividendYield']) : null,
-      payoutRatio: data['PayoutRatio'] ? parseFloat(data['PayoutRatio']) : null,
-      
+      revenueGrowth: financialData?.revenueGrowth || null,
+      dividendYield: summaryDetail?.dividendYield ? (summaryDetail.dividendYield * 100) : null,
+      payoutRatio: defaultKeyStatistics?.payoutRatio || null,
+
       // Other Metrics
-      marketCap: data['MarketCapitalization'] ? parseInt(data['MarketCapitalization']) : null,
-      bookValue: data['BookValue'] ? parseFloat(data['BookValue']) : null,
-      beta: data['Beta'] ? parseFloat(data['Beta']) : null,
-      week52High: data['52WeekHigh'] ? parseFloat(data['52WeekHigh']) : null,
-      week52Low: data['52WeekLow'] ? parseFloat(data['52WeekLow']) : null,
-      
+      marketCap: summaryDetail?.marketCap || null,
+      bookValue: defaultKeyStatistics?.bookValue || null,
+      beta: defaultKeyStatistics?.beta || null,
+      week52High: summaryDetail?.fiftyTwoWeekHigh || null,
+      week52Low: summaryDetail?.fiftyTwoWeekLow || null,
+
       // Company Info
-      name: data['Name'] || symbol,
-      sector: data['Sector'] || 'N/A',
-      industry: data['Industry'] || 'N/A',
-      description: data['Description'] || 'N/A',
+      name: assetProfile?.longName || symbol,
+      sector: assetProfile?.sector || 'N/A',
+      industry: assetProfile?.industry || 'N/A',
+      description: assetProfile?.longBusinessSummary || 'N/A',
     }
+
+    console.log('[Yahoo Finance] Fundamentals fetched successfully (POST):', symbol)
 
     return Response.json(fundamentals, {
       headers: {
@@ -150,7 +144,7 @@ export async function POST(request: Request) {
       },
     })
   } catch (error) {
-    console.error('[v0] Fundamentals fetch error:', error)
+    console.error('[Yahoo Finance] Fundamentals fetch error:', error)
     return Response.json({ error: 'Failed to fetch fundamentals' }, { status: 500 })
   }
 }

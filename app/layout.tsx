@@ -1,13 +1,15 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { ThemeProvider } from '@/components/theme-provider'
+import { AuthProvider } from '@/contexts/auth-context'
 import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'StockSync - AI-Powered Portfolio Analytics',
+  title: 'QuantPilot - AI-Powered Portfolio Analytics',
   description: 'Advanced stock market analytics with AI-powered insights and portfolio management',
   generator: 'v0.app',
   icons: {
@@ -35,9 +37,18 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`font-sans antialiased`}>
-        {children}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthProvider>
+            {children}
+          </AuthProvider>
+        </ThemeProvider>
         <Analytics />
       </body>
     </html>

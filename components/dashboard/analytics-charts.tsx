@@ -2,9 +2,15 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart } from 'recharts'
+import { useHistoricalData } from '@/hooks/use-historical-data'
+import { Skeleton } from '@/components/ui/skeleton'
 
 // Advanced indicator calculations
-function calculateIndicators(prices: number[]) {
+function calculateIndicators(historicalData: Array<{ date: string; close: number; volume: number; high: number; low: number }>) {
+  const prices = historicalData.map(d => d.close)
+  const volumes = historicalData.map(d => d.volume)
+  const highs = historicalData.map(d => d.high)
+  const lows = historicalData.map(d => d.low)
   const data = []
   
   for (let i = 0; i < prices.length; i++) {
@@ -44,13 +50,33 @@ function calculateIndicators(prices: number[]) {
 
     // Stochastic Oscillator
     if (i >= 13) {
-      const low14 = Math.min(...prices.slice(i - 13, i + 1))
-      const high14 = Math.max(...prices.slice(i - 13, i + 1))
+      const low14 = Math.min(...lows.slice(i - 13, i + 1))
+      const high14 = Math.max(...highs.slice(i - 13, i + 1))
       stochastic = ((prices[i] - low14) / (high14 - low14)) * 100
     }
 
+    // RSI Calculation
+    let rsi = null
+    if (i >= 14) {
+      const changes = []
+      for (let j = i - 13; j <= i; j++) {
+        changes.push(prices[j] - prices[j - 1])
+      }
+      const gains = changes.map(c => c > 0 ? c : 0)
+      const losses = changes.map(c => c < 0 ? -c : 0)
+      const avgGain = gains.reduce((a, b) => a + b, 0) / 14
+      const avgLoss = losses.reduce((a, b) => a + b, 0) / 14
+
+      if (avgLoss === 0) {
+        rsi = 100
+      } else {
+        const rs = avgGain / avgLoss
+        rsi = 100 - (100 / (1 + rs))
+      }
+    }
+
     data.push({
-      date: `Day ${i + 1}`,
+      date: historicalData[i].date,
       price: prices[i],
       macd,
       signal,
@@ -59,7 +85,8 @@ function calculateIndicators(prices: number[]) {
       bollinger_middle,
       bollinger_lower,
       stochastic,
-      volume: Math.random() * 1000000,
+      rsi,
+      volume: volumes[i],
     })
   }
 
@@ -77,18 +104,40 @@ function calculateEMA(prices: number[], period: number): number {
   return ema
 }
 
-// Generate mock price data
-const generatePrices = () => {
-  const prices = [150]
-  for (let i = 1; i < 60; i++) {
-    prices.push(prices[i - 1] + (Math.random() - 0.48) * 2)
-  }
-  return prices
-}
-
 export function AnalyticsCharts({ symbol }: { symbol: string }) {
-  const prices = generatePrices()
-  const data = calculateIndicators(prices)
+  const { data: historicalData, loading, error } = useHistoricalData(symbol, 60)
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        {[...Array(5)].map((_, i) => (
+          <Card key={i}>
+            <CardHeader>
+              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-4 w-32 mt-2" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-[300px] w-full" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
+  if (error || !historicalData || !historicalData.data || historicalData.data.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-12">
+          <p className="text-center text-muted-foreground">
+            {error || 'No historical data available for this symbol'}
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const data = calculateIndicators(historicalData.data)
 
   return (
     <div className="space-y-6">
@@ -187,12 +236,13 @@ export function AnalyticsCharts({ symbol }: { symbol: string }) {
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
               <XAxis dataKey="date" stroke="var(--color-muted-foreground)" tick={{ fontSize: 12 }} />
               <YAxis domain={[0, 100]} stroke="var(--color-muted-foreground)" tick={{ fontSize: 12 }} />
-              <Tooltip 
+              <Tooltip
                 contentStyle={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '6px' }}
                 labelStyle={{ color: 'var(--color-foreground)' }}
                 formatter={(value: any) => value?.toFixed(2)}
               />
               <Legend />
+              <Line type="monotone" dataKey="rsi" stroke="var(--color-primary)" dot={false} strokeWidth={2} name="RSI" />
               <Line type="monotone" dataKey={() => 70} stroke="var(--color-destructive)" strokeDasharray="5 5" dot={false} name="Overbought" />
               <Line type="monotone" dataKey={() => 30} stroke="var(--color-chart-1)" strokeDasharray="5 5" dot={false} name="Oversold" />
             </LineChart>

@@ -1,42 +1,47 @@
+import YahooFinance from 'yahoo-finance2'
+
+const yahooFinance = new YahooFinance()
+
 export async function POST(request: Request) {
   try {
     const { symbol, days = 30 } = await request.json()
 
-    const apiKey = process.env.ALPHA_VANTAGE_API_KEY
-    if (!apiKey) {
-      return Response.json(
-        { error: 'Alpha Vantage API key not configured' },
-        { status: 500 }
-      )
+    if (!symbol) {
+      return Response.json({ error: 'Symbol required' }, { status: 400 })
     }
 
-    // Fetch from Alpha Vantage TIME_SERIES_DAILY
-    const alphaUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=full&apikey=${apiKey}`
-    const response = await fetch(alphaUrl)
-    const alphaData = await response.json()
+    console.log('[Yahoo Finance] Fetching historical data for:', symbol, 'Days:', days)
 
-    if (!alphaData['Time Series (Daily)']) {
+    // Calculate date range
+    const endDate = new Date()
+    const startDate = new Date()
+    startDate.setDate(endDate.getDate() - days)
+
+    // Fetch historical data from Yahoo Finance
+    const result = await yahooFinance.historical(symbol, {
+      period1: startDate,
+      period2: endDate,
+      interval: '1d'
+    }, { validateResult: false })
+
+    if (!result || result.length === 0) {
       return Response.json({ error: 'Symbol not found or no data available' }, { status: 404 })
     }
 
-    const timeSeries = alphaData['Time Series (Daily)']
-    const dates = Object.keys(timeSeries).sort().reverse().slice(0, days)
+    const historicalData = result.map(item => ({
+      date: item.date.toISOString().split('T')[0],
+      open: item.open,
+      close: item.close,
+      high: item.high,
+      low: item.low,
+      volume: item.volume,
+    }))
 
-    const historicalData = dates
-      .sort()
-      .map(date => ({
-        date: date,
-        open: parseFloat(timeSeries[date]['1. open']),
-        close: parseFloat(timeSeries[date]['4. close']),
-        high: parseFloat(timeSeries[date]['2. high']),
-        low: parseFloat(timeSeries[date]['3. low']),
-        volume: parseInt(timeSeries[date]['5. volume']),
-      }))
-      .reverse()
+    console.log('[Yahoo Finance] Historical data fetched successfully:', historicalData.length, 'records')
 
     return Response.json({ symbol: symbol.toUpperCase(), data: historicalData })
   } catch (error) {
-    console.error('Historical data error:', error)
+    console.error('[Yahoo Finance] Historical data error:', error)
     return Response.json({ error: 'Failed to fetch historical data' }, { status: 500 })
   }
 }
