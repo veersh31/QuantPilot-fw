@@ -1,17 +1,15 @@
 'use client'
 
-import { BarChart3, Settings, Moon, Sun, LogIn, LogOut, User } from 'lucide-react'
+import { BarChart3, Settings, Moon, Sun, LogOut, User, Shield, TrendingUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTheme } from 'next-themes'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/auth-context'
-import { AuthDialog } from '@/components/auth/auth-dialog'
 
 export function DashboardHeader() {
   const { theme, setTheme } = useTheme()
-  const { user, isAuthenticated, logout } = useAuth()
+  const { profile, isAuthenticated, currentMode, setCurrentMode, logout } = useAuth()
   const [mounted, setMounted] = useState(false)
-  const [showAuthDialog, setShowAuthDialog] = useState(false)
 
   // Avoid hydration mismatch
   useEffect(() => {
@@ -35,51 +33,50 @@ export function DashboardHeader() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {mounted && (
+        <div className="flex items-center gap-3">
+          {mounted && isAuthenticated && (
             <>
+              {/* Mode Switcher */}
+              <div className="hidden md:flex items-center gap-1 p-1 rounded-lg bg-muted">
+                <Button
+                  variant={currentMode === 'paper' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setCurrentMode('paper')}
+                  className="gap-2 text-xs"
+                >
+                  <Shield size={14} />
+                  Paper Trading
+                </Button>
+                <Button
+                  variant={currentMode === 'real' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setCurrentMode('real')}
+                  className="gap-2 text-xs"
+                >
+                  <TrendingUp size={14} />
+                  Real Portfolio
+                </Button>
+              </div>
+
+              {/* Theme Toggle */}
               <Button variant="ghost" size="icon" onClick={toggleTheme}>
                 {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
               </Button>
 
-              {isAuthenticated ? (
-                <>
-                  <Button variant="ghost" size="icon" title={user?.name}>
-                    {user?.avatar ? (
-                      <img
-                        src={user.avatar}
-                        alt={user.name}
-                        className="w-6 h-6 rounded-full"
-                      />
-                    ) : (
-                      <User size={20} />
-                    )}
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={logout} title="Logout">
-                    <LogOut size={20} />
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowAuthDialog(true)}
-                  className="gap-2"
-                >
-                  <LogIn size={16} />
-                  Sign In
-                </Button>
-              )}
+              {/* Profile */}
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted">
+                <User size={16} className="text-muted-foreground" />
+                <span className="text-sm font-medium hidden sm:inline">{profile?.username}</span>
+              </div>
 
-              <Button variant="ghost" size="icon">
-                <Settings size={20} />
+              {/* Logout */}
+              <Button variant="ghost" size="icon" onClick={logout} title="Logout">
+                <LogOut size={20} />
               </Button>
             </>
           )}
         </div>
       </div>
-
-      {showAuthDialog && <AuthDialog onClose={() => setShowAuthDialog(false)} />}
     </header>
   )
 }

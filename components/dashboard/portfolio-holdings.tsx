@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TrendingUp, TrendingDown, Trash2, Edit2, Check, X, Download } from 'lucide-react'
 import { exportPortfolioToCSV } from '@/lib/export-utils'
+import { toast } from 'sonner'
 
 interface PortfolioStock {
   symbol: string

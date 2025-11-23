@@ -12,6 +12,9 @@ export interface StockData {
   dividendYield: number
   volume: number
   avgVolume: number
+  timestamp?: string
+  quoteType?: string
+  isETF?: boolean
 }
 
 export function useStockData(symbol: string | null) {
@@ -45,7 +48,7 @@ export function useStockData(symbol: string | null) {
 
   useEffect(() => {
     fetchStockData()
-    const interval = setInterval(fetchStockData, 5000) // Update every 5 seconds
+    const interval = setInterval(fetchStockData, 60000) // Update every 60 seconds (1 min)
 
     return () => clearInterval(interval)
   }, [fetchStockData])

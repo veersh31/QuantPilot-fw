@@ -29,6 +29,10 @@ export async function POST(request: Request) {
     const change = priceModule.regularMarketChange || 0
     const changePercent = priceModule.regularMarketChangePercent || 0
 
+    // Detect if this is an ETF or stock
+    const quoteType = priceModule.quoteType || 'EQUITY'
+    const isETF = quoteType === 'ETF'
+
     const stockData = {
       symbol: symbol.toUpperCase(),
       price: price,
@@ -42,6 +46,8 @@ export async function POST(request: Request) {
       volume: priceModule.regularMarketVolume || 0,
       avgVolume: priceModule.averageDailyVolume3Month || 0,
       timestamp: new Date().toISOString(),
+      quoteType: quoteType,
+      isETF: isETF,
     }
 
     logger.stockFetch(symbol, true)

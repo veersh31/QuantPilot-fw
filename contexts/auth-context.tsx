@@ -2,21 +2,18 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { useLocalStorage } from '@/hooks/use-local-storage'
-
-interface User {
-  id: string
-  email: string
-  name: string
-  avatar?: string
-}
+import { UserProfile, TradingMode } from '@/lib/types/user'
 
 interface AuthContextType {
-  user: User | null
+  profile: UserProfile | null
   isAuthenticated: boolean
   isLoading: boolean
-  login: (email: string, password: string) => Promise<boolean>
+  currentMode: TradingMode
+  hasCompletedOnboarding: boolean
+  setProfile: (profile: UserProfile) => void
+  setCurrentMode: (mode: TradingMode) => void
+  completeOnboarding: () => void
   logout: () => void
-  signup: (email: string, password: string, name: string) => Promise<boolean>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -33,69 +30,55 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
  * - Firebase Auth (https://firebase.google.com/docs/auth)
  */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useLocalStorage<User | null>('quantpilot-user', null)
+  const [profile, setProfile] = useLocalStorage<UserProfile | null>('quantpilot-profile', null)
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useLocalStorage<boolean>('quantpilot-onboarding', false)
   const [isLoading, setIsLoading] = useState(true)
+  const [currentMode, setCurrentMode] = useState<TradingMode>('paper')
 
   useEffect(() => {
-    // Simulate checking auth status
-    setIsLoading(false)
-  }, [])
-
-  const login = async (email: string, password: string): Promise<boolean> => {
-    try {
-      // Demo implementation - always succeeds
-      // In production, call your auth API:
-      // const response = await fetch('/api/auth/login', { ... })
-
-      const demoUser: User = {
-        id: '1',
-        email,
-        name: email.split('@')[0],
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
-      }
-
-      setUser(demoUser)
-      return true
-    } catch (error) {
-      console.error('Login error:', error)
-      return false
+    // Initialize mode from profile
+    if (profile) {
+      setCurrentMode(profile.tradingMode)
     }
+    setIsLoading(false)
+  }, [profile])
+
+  const completeOnboarding = () => {
+    setHasCompletedOnboarding(true)
   }
 
   const logout = () => {
-    setUser(null)
+    setProfile(null)
+    setHasCompletedOnboarding(false)
+    setCurrentMode('paper')
   }
 
-  const signup = async (email: string, password: string, name: string): Promise<boolean> => {
-    try {
-      // Demo implementation - always succeeds
-      // In production, call your auth API:
-      // const response = await fetch('/api/auth/signup', { ... })
-
-      const demoUser: User = {
-        id: Date.now().toString(),
-        email,
-        name,
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
-      }
-
-      setUser(demoUser)
-      return true
-    } catch (error) {
-      console.error('Signup error:', error)
-      return false
+  const handleSetCurrentMode = (mode: TradingMode) => {
+    setCurrentMode(mode)
+    if (profile) {
+      setProfile({
+        ...profile,
+        tradingMode: mode,
+        preferences: {
+          ...profile.preferences,
+          defaultMode: mode
+        }
+      })
     }
   }
 
   return (
     <AuthContext.Provider
       value={{
-        user,
-        isAuthenticated: !!user,
+        profile,
+        isAuthenticated: !!profile && hasCompletedOnboarding,
         isLoading,
-        login,
+        currentMode,
+        hasCompletedOnboarding,
+        setProfile,
+        setCurrentMode: handleSetCurrentMode,
+        completeOnboarding,
         logout,
-        signup,
       }}
     >
       {children}

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Send, Loader2 } from 'lucide-react'
@@ -52,12 +51,14 @@ export function AIChat({ portfolio, selectedStock }: any) {
       content: input
     }
 
-    setMessages(prev => [...prev, userMessage])
+    const updatedMessages = [...messages, userMessage]
+    setMessages(updatedMessages)
     setInput('')
     setIsLoading(true)
 
     try {
-      const response = await generateResponse(input, portfolio, selectedStock)
+      // Pass full conversation history for context
+      const response = await generateResponse(input, portfolio, selectedStock, updatedMessages)
       const assistantMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -78,49 +79,46 @@ export function AIChat({ portfolio, selectedStock }: any) {
   }
 
   return (
-    <Card className="h-full flex flex-col">
-      <CardHeader>
-        <CardTitle>AI Trading Advisor</CardTitle>
-        <CardDescription>Powered by Groq & Industry Algorithms</CardDescription>
-      </CardHeader>
-      <CardContent className="flex-1 flex flex-col">
-        <div className="flex-1 overflow-y-auto mb-4 space-y-3 pr-2">
-          {messages.map((message) => (
+    <div className="h-full flex flex-col bg-background">
+      {/* Messages Area - Scrollable */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+          >
             <div
-              key={message.id}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              className={`max-w-[85%] px-4 py-3 rounded-lg ${
+                message.role === 'user'
+                  ? 'bg-primary text-primary-foreground rounded-br-none'
+                  : 'bg-muted text-foreground rounded-bl-none'
+              }`}
             >
-              <div
-                className={`max-w-md px-4 py-3 rounded-lg ${
-                  message.role === 'user'
-                    ? 'bg-primary text-primary-foreground rounded-br-none'
-                    : 'bg-muted text-foreground rounded-bl-none'
-                }`}
-              >
-                {message.role === 'user' ? (
-                  <p className="text-sm">{message.content}</p>
-                ) : (
-                  <div className="text-sm space-y-1">
-                    {formatMessage(message.content)}
-                  </div>
-                )}
-              </div>
+              {message.role === 'user' ? (
+                <p className="text-sm">{message.content}</p>
+              ) : (
+                <div className="text-sm space-y-1">
+                  {formatMessage(message.content)}
+                </div>
+              )}
             </div>
-          ))}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-muted text-foreground px-4 py-3 rounded-lg rounded-bl-none">
-                <Loader2 className="w-4 h-4 animate-spin" />
-              </div>
+          </div>
+        ))}
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="bg-muted text-foreground px-4 py-3 rounded-lg rounded-bl-none">
+              <Loader2 className="w-4 h-4 animate-spin" />
             </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
 
-        {/* Input Area */}
+      {/* Input Area - Fixed at Bottom */}
+      <div className="flex-shrink-0 border-t border-border bg-background p-4">
         <div className="flex gap-2">
           <Input
-            placeholder="Ask something..."
+            placeholder="Ask about stocks, predictions, or portfolio..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -141,7 +139,7 @@ export function AIChat({ portfolio, selectedStock }: any) {
             <Send size={16} />
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

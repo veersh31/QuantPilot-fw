@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Star, StarOff, TrendingUp, TrendingDown, Plus, X } from 'lucide-react'
 import { useLocalStorage } from '@/hooks/use-local-storage'
+import { toast } from 'sonner'
 
 interface WatchlistStock {
   symbol: string
@@ -105,13 +106,15 @@ export function Watchlist({ onStockSelect }: WatchlistProps) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Star size={20} className="text-amber-500" />
+    <Card className="border-2 shadow-lg bg-gradient-to-br from-card to-card/50">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-3 text-xl">
+          <div className="p-2 rounded-lg bg-amber-500/10">
+            <Star size={22} className="text-amber-500 fill-amber-500" />
+          </div>
           Watchlist
         </CardTitle>
-        <CardDescription>Stocks you're tracking</CardDescription>
+        <CardDescription className="text-sm">Stocks you're tracking</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Add to Watchlist */}
@@ -126,23 +129,30 @@ export function Watchlist({ onStockSelect }: WatchlistProps) {
               }
             }}
             disabled={adding}
-            className="text-sm"
+            className="text-sm font-medium border-2 focus:border-primary"
           />
           <Button
             size="sm"
             onClick={handleAddStock}
             disabled={adding || !newSymbol.trim()}
+            className="px-4 bg-primary hover:bg-primary/90 shadow-md"
           >
-            <Plus size={16} />
+            <Plus size={18} />
           </Button>
         </div>
 
         {/* Watchlist Items */}
-        <div className="space-y-2 max-h-96 overflow-y-auto">
+        <div className="space-y-2 max-h-96 overflow-y-auto pr-1 custom-scrollbar">
           {watchlist.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">
-              No stocks in watchlist. Add symbols to track them.
-            </p>
+            <div className="text-center py-12 px-4 rounded-lg bg-muted/30 border-2 border-dashed border-border">
+              <Star size={32} className="mx-auto mb-3 text-muted-foreground/40" />
+              <p className="text-sm text-muted-foreground font-medium">
+                No stocks in watchlist
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Add symbols to track them
+              </p>
+            </div>
           ) : (
             watchlist.map((stock) => {
               const currentPrice = updatedPrices[stock.symbol]?.price ?? stock.price
@@ -152,17 +162,17 @@ export function Watchlist({ onStockSelect }: WatchlistProps) {
               return (
                 <div
                   key={stock.symbol}
-                  className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted cursor-pointer"
+                  className="group flex items-center justify-between p-4 rounded-lg border-2 border-border/60 bg-gradient-to-br from-muted/40 to-muted/20 hover:from-muted/60 hover:to-muted/40 hover:border-primary/50 cursor-pointer transition-all duration-200 hover:shadow-md"
                   onClick={() => onStockSelect?.(stock.symbol)}
                 >
                   <div className="flex-1">
-                    <p className="font-semibold text-foreground">{stock.symbol}</p>
+                    <p className="font-bold text-foreground text-base tracking-tight">{stock.symbol}</p>
                     {currentPrice && (
-                      <div className="flex items-center gap-2 mt-1">
-                        <p className="text-sm font-medium">${currentPrice.toFixed(2)}</p>
+                      <div className="flex items-center gap-3 mt-1.5">
+                        <p className="text-sm font-semibold text-foreground">${currentPrice.toFixed(2)}</p>
                         {change !== undefined && changePercent !== undefined && (
-                          <span className={`text-xs flex items-center gap-1 ${change >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
-                            {change >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                          <span className={`text-xs font-medium flex items-center gap-1 px-2 py-0.5 rounded-full ${change >= 0 ? 'text-emerald-600 bg-emerald-500/10' : 'text-red-600 bg-red-500/10'}`}>
+                            {change >= 0 ? <TrendingUp size={14} strokeWidth={2.5} /> : <TrendingDown size={14} strokeWidth={2.5} />}
                             {change >= 0 ? '+' : ''}{changePercent.toFixed(2)}%
                           </span>
                         )}
@@ -176,9 +186,9 @@ export function Watchlist({ onStockSelect }: WatchlistProps) {
                       e.stopPropagation()
                       handleRemoveStock(stock.symbol)
                     }}
-                    className="text-muted-foreground hover:text-destructive"
+                    className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
                   >
-                    <X size={16} />
+                    <X size={18} strokeWidth={2} />
                   </Button>
                 </div>
               )
