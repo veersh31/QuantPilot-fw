@@ -5,6 +5,23 @@ import { calculateTechnicalAnalysis, PriceData } from '@/lib/technical-indicator
 
 const yahooFinance = new YahooFinance()
 
+// Helper function to format time ago
+function getTimeAgo(dateString: string): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffHours / 24)
+
+  if (diffDays > 0) {
+    return `${diffDays}d ago`
+  } else if (diffHours > 0) {
+    return `${diffHours}h ago`
+  } else {
+    return 'Just now'
+  }
+}
+
 // Fetch real technical indicators for a stock
 async function fetchTechnicalIndicators(symbol: string) {
   try {
@@ -52,22 +69,91 @@ function generatePortfolioContext(portfolio: any[]) {
   return `Portfolio Summary:\n${holdings}\nTotal Portfolio Value: $${totalValue.toFixed(2)}`
 }
 
+// Extract stock symbols from user message (e.g., AAPL, MSFT, GOOGL, or "apple", "amazon")
+function extractStockSymbols(message: string): string[] {
+  const lowerMessage = message.toLowerCase()
+
+  // Company name to symbol mapping
+  const companyMap: { [key: string]: string } = {
+    'apple': 'AAPL',
+    'microsoft': 'MSFT',
+    'google': 'GOOGL',
+    'alphabet': 'GOOGL',
+    'amazon': 'AMZN',
+    'meta': 'META',
+    'facebook': 'META',
+    'tesla': 'TSLA',
+    'nvidia': 'NVDA',
+    'amd': 'AMD',
+    'netflix': 'NFLX',
+    'disney': 'DIS',
+    'paypal': 'PYPL',
+    'intel': 'INTC',
+    'cisco': 'CSCO',
+    'adobe': 'ADBE',
+    'salesforce': 'CRM',
+    'oracle': 'ORCL',
+    'ibm': 'IBM',
+    'qualcomm': 'QCOM',
+    'texas instruments': 'TXN',
+    'broadcom': 'AVGO',
+    'costco': 'COST',
+    'pepsi': 'PEP',
+    'coca cola': 'KO',
+    'walmart': 'WMT',
+    'jpmorgan': 'JPM',
+    'jp morgan': 'JPM',
+    'bank of america': 'BAC',
+    'wells fargo': 'WFC',
+    'goldman sachs': 'GS',
+    'morgan stanley': 'MS',
+    'citigroup': 'C',
+    'visa': 'V',
+    'mastercard': 'MA',
+    'johnson & johnson': 'JNJ',
+    'unitedhealth': 'UNH',
+    'pfizer': 'PFE',
+    'abbvie': 'ABBV',
+    'exxon': 'XOM',
+    'chevron': 'CVX'
+  }
+
+  // Check for company names first
+  for (const [name, symbol] of Object.entries(companyMap)) {
+    if (lowerMessage.includes(name)) {
+      return [symbol]
+    }
+  }
+
+  // Then check for uppercase stock symbols
+  const symbolPattern = /\b[A-Z]{1,5}\b/g
+  const matches = message.match(symbolPattern) || []
+  const commonWords = ['I', 'A', 'THE', 'AND', 'OR', 'BUT', 'FOR', 'NOT', 'WITH', 'AS', 'AT', 'BY', 'TO', 'FROM', 'IN', 'ON', 'OF', 'IS', 'IT', 'AI', 'ML', 'USA', 'US', 'ETF', 'PE', 'PS', 'PB', 'RSI', 'MACD', 'SMA', 'EMA', 'OK', 'CEO', 'CFO', 'IPO', 'API', 'FAQ']
+  return matches.filter(symbol => !commonWords.includes(symbol))
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json()
     const { message, portfolio, selectedStock, conversationHistory = [], mlPredictions = null } = body
 
-    // Fetch real technical indicators if a stock is selected
+    // Detect if user is asking about a specific stock in their message
+    const mentionedSymbols = extractStockSymbols(message)
+
+    // Use the first mentioned symbol, or fall back to selectedStock
+    const targetStock = mentionedSymbols.length > 0 ? mentionedSymbols[0] : selectedStock
+
+    // Fetch real technical indicators for the target stock
     let technicalData = null
     let isETF = false
     let quoteType = 'stock'
 
-    if (selectedStock) {
-      technicalData = await fetchTechnicalIndicators(selectedStock)
+    if (targetStock) {
+      technicalData = await fetchTechnicalIndicators(targetStock)
 
       // Check if this is an ETF
       try {
-        const quoteData = await yahooFinance.quoteSummary(selectedStock, {
+        const quoteData = await yahooFinance.quoteSummary(targetStock, {
           modules: ['price']
         }, { validateResult: false })
 
@@ -80,13 +166,36 @@ export async function POST(request: Request) {
       }
     }
 
+    // Fetch recent news for the target stock
+    let newsData: any[] = []
+    if (targetStock) {
+      try {
+        const newsResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stocks/news`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbol: targetStock }),
+        })
+
+        if (newsResponse.ok) {
+          const newsJson = await newsResponse.json()
+          newsData = newsJson.news || []
+        }
+      } catch (error) {
+        console.error('Error fetching news:', error)
+      }
+    }
+
     // Build comprehensive context for the AI
     const portfolioContext = generatePortfolioContext(portfolio)
 
     let technicalContext = ''
-    if (selectedStock && technicalData) {
+    if (targetStock && technicalData) {
+      const contextPrefix = mentionedSymbols.length > 0
+        ? `User is asking about ${targetStock}. Here are the real technical indicators:`
+        : `Currently viewing ${targetStock} with real technical indicators:`
+
       technicalContext = `
-Currently analyzing ${selectedStock} with real technical indicators:
+${contextPrefix}
 
 RSI: ${technicalData.rsi.value.toFixed(2)} (${technicalData.rsi.signal}) - ${technicalData.rsi.description}
 
@@ -106,20 +215,41 @@ Stochastic: %K ${technicalData.stochastic.k.toFixed(2)}, %D ${technicalData.stoc
 Signal: ${technicalData.stochastic.signal} - ${technicalData.stochastic.description}
 
 OVERALL SIGNAL: ${technicalData.overallSignal.toUpperCase().replace('_', ' ')}`
-    } else if (selectedStock) {
-      technicalContext = `Currently analyzing ${selectedStock} - technical data loading...`
+    } else if (targetStock) {
+      technicalContext = `User is asking about ${targetStock} - fetching technical data...`
     } else {
-      technicalContext = 'No specific stock selected for detailed analysis.'
+      technicalContext = 'User has not specified a particular stock. Feel free to answer general questions or ask them to specify a stock symbol for detailed analysis.'
+    }
+
+    // Build News context
+    let newsContext = ''
+    if (newsData.length > 0 && targetStock) {
+      const topNews = newsData.slice(0, 5) // Get top 5 news items
+      newsContext = `
+📰 LATEST NEWS FOR ${targetStock}:
+${topNews.map((item, idx) => {
+        const timeAgo = getTimeAgo(item.publishedAt)
+        return `
+${idx + 1}. ${item.title}
+   Summary: ${item.summary}
+   Source: ${item.source} | ${timeAgo}
+   Sentiment: ${item.sentiment || 'neutral'}`
+      }).join('\n')}
+
+When discussing news, reference these actual headlines and their sentiment.
+`
+    } else if (targetStock) {
+      newsContext = `No recent news available for ${targetStock}.`
     }
 
     // Build ML Predictions context
     let mlContext = ''
-    if (mlPredictions && selectedStock) {
+    if (mlPredictions && targetStock) {
       const pred = mlPredictions.predictions
       const backtest = mlPredictions.backtest
 
       mlContext = `
-🤖 MACHINE LEARNING PRICE PREDICTIONS FOR ${selectedStock}:
+🤖 MACHINE LEARNING PRICE PREDICTIONS FOR ${targetStock}:
 Current Price: $${mlPredictions.current_price}
 `
 
@@ -159,7 +289,7 @@ Current Price: $${mlPredictions.current_price}
       }
 
       mlContext += `
-⚠️ CRITICAL: When discussing ${selectedStock} price predictions, YOU MUST cite these EXACT predicted values above. Never estimate or guess - use the precise numbers provided by the ML model.
+⚠️ CRITICAL: When discussing ${targetStock} price predictions, YOU MUST cite these EXACT predicted values above. Never estimate or guess - use the precise numbers provided by the ML model.
 `
     }
 
@@ -183,13 +313,18 @@ When responding:
 2. Use clear, direct language - no excessive markdown or formatting
 3. PRIORITIZE ML predictions when available - cite EXACT predicted prices and returns
 4. Combine ML predictions with technical indicators for comprehensive analysis
-5. Give one primary recommendation based on data-driven analysis
-6. Mention 1-2 risks or considerations
-7. End with a clear actionable suggestion
+5. When news is available, reference specific headlines and their sentiment
+6. Give one primary recommendation based on data-driven analysis
+7. Mention 1-2 risks or considerations
+8. End with a clear actionable suggestion
+
+IMPORTANT: You can answer questions about ANY stock, not just the one currently selected. If the user asks about a specific stock symbol (e.g., AAPL, MSFT, TSLA), provide analysis for that stock even if a different stock is selected in the UI.
 
 ${assetTypeGuidance}
 
 ${portfolioContext}
+
+${newsContext}
 
 ${mlContext}
 
@@ -197,9 +332,11 @@ ${technicalContext}
 
 Remember:
 - When ML predictions are available, ALWAYS cite the exact predicted prices and percentage returns
-- Combine ML model forecasts with technical analysis for robust recommendations
+- When news is available, reference specific headlines and their sentiment to provide context
+- Combine news sentiment, ML forecasts, and technical analysis for comprehensive recommendations
 - Base your analysis on REAL data provided above, not generic advice
-- The ML model uses 29+ quantitative features and has been backtested`
+- The ML model uses 29+ quantitative features and has been backtested
+- If the user asks about a stock and you don't have technical data for it, acknowledge that and provide general guidance or offer to analyze it if they want`
 
     // Build messages array with conversation history
     const messages: any[] = conversationHistory.slice(-10).map((msg: any) => ({
