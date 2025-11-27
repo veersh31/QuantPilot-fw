@@ -102,12 +102,12 @@ export default function Home() {
 
   return (
     <StockDataProvider>
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10 flex flex-col">
+      <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-blue-500/5 flex flex-col">
         <DashboardHeader />
         <DisclaimerBanner />
 
-        <main className="container mx-auto px-4 py-8 flex-grow max-w-[1600px]">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <main className="container mx-auto px-6 py-10 flex-grow max-w-[1600px]">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-500">
           {/* Left Column - Main Analytics */}
           <div className="lg:col-span-2 space-y-6">
             <PortfolioOverview portfolio={portfolio} />
@@ -299,13 +299,20 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Floating AI Chat Button */}
+      {/* Floating AI Chat Button - Enhanced */}
       <Button
         size="lg"
         onClick={() => setIsChatOpen(!isChatOpen)}
-        className="fixed bottom-6 right-6 h-16 w-16 rounded-full shadow-2xl hover:shadow-primary/50 transition-all duration-300 hover:scale-110 z-50 bg-gradient-to-br from-primary to-primary/80"
+        className="fixed bottom-8 right-8 h-16 w-16 rounded-2xl shadow-2xl hover:shadow-blue-500/50 transition-all duration-300 hover:scale-110 z-50 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 border-2 border-white/20 backdrop-blur-sm group"
       >
-        {isChatOpen ? <X size={28} strokeWidth={2.5} /> : <MessageSquare size={28} strokeWidth={2.5} />}
+        {isChatOpen ? (
+          <X size={28} strokeWidth={2.5} className="group-hover:rotate-90 transition-transform duration-300" />
+        ) : (
+          <MessageSquare size={28} strokeWidth={2.5} className="group-hover:scale-110 transition-transform duration-300" />
+        )}
+        {!isChatOpen && (
+          <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-background animate-pulse" />
+        )}
       </Button>
 
       {/* Sliding Chat Panel */}

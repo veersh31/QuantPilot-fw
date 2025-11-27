@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Star, StarOff, TrendingUp, TrendingDown, Plus, X } from 'lucide-react'
 import { useLocalStorage } from '@/hooks/use-local-storage'
 import { toast } from 'sonner'
+import { Sparkline } from '@/components/ui/sparkline'
 
 interface WatchlistStock {
   symbol: string
@@ -25,8 +26,9 @@ export function Watchlist({ onStockSelect }: WatchlistProps) {
   const [newSymbol, setNewSymbol] = useState('')
   const [adding, setAdding] = useState(false)
   const [updatedPrices, setUpdatedPrices] = useState<{ [key: string]: any }>({})
+  const [sparklineData, setSparklineData] = useState<{ [key: string]: number[] }>({})
 
-  // Fetch prices for watchlist stocks
+  // Fetch prices and sparkline data for watchlist stocks
   useEffect(() => {
     const fetchPrices = async () => {
       for (const stock of watchlist) {
@@ -54,9 +56,35 @@ export function Watchlist({ onStockSelect }: WatchlistProps) {
       }
     }
 
+    const fetchSparklines = async () => {
+      for (const stock of watchlist) {
+        try {
+          const response = await fetch('/api/stocks/historical', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ symbol: stock.symbol, days: 7 }),
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            if (data.data && data.data.length > 0) {
+              const prices = data.data.map((d: any) => d.close)
+              setSparklineData(prev => ({
+                ...prev,
+                [stock.symbol]: prices
+              }))
+            }
+          }
+        } catch (error) {
+          console.error(`Error fetching sparkline for ${stock.symbol}:`, error)
+        }
+      }
+    }
+
     if (watchlist.length > 0) {
       fetchPrices()
-      const interval = setInterval(fetchPrices, 60000) // Update every minute
+      fetchSparklines()
+      const interval = setInterval(fetchPrices, 60000) // Update prices every minute
       return () => clearInterval(interval)
     }
   }, [watchlist])
@@ -162,10 +190,10 @@ export function Watchlist({ onStockSelect }: WatchlistProps) {
               return (
                 <div
                   key={stock.symbol}
-                  className="group flex items-center justify-between p-4 rounded-lg border-2 border-border/60 bg-gradient-to-br from-muted/40 to-muted/20 hover:from-muted/60 hover:to-muted/40 hover:border-primary/50 cursor-pointer transition-all duration-200 hover:shadow-md"
+                  className="group flex items-center justify-between gap-3 p-4 rounded-lg border-2 border-border/60 bg-gradient-to-br from-muted/40 to-muted/20 hover:from-muted/60 hover:to-muted/40 hover:border-primary/50 cursor-pointer transition-all duration-200 hover:shadow-md"
                   onClick={() => onStockSelect?.(stock.symbol)}
                 >
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <p className="font-bold text-foreground text-base tracking-tight">{stock.symbol}</p>
                     {currentPrice && (
                       <div className="flex items-center gap-3 mt-1.5">
@@ -179,6 +207,19 @@ export function Watchlist({ onStockSelect }: WatchlistProps) {
                       </div>
                     )}
                   </div>
+
+                  {/* Mini Sparkline Chart */}
+                  {sparklineData[stock.symbol] && (
+                    <div className="flex-shrink-0">
+                      <Sparkline
+                        data={sparklineData[stock.symbol]}
+                        width={70}
+                        height={28}
+                        className="opacity-80 group-hover:opacity-100 transition-opacity"
+                      />
+                    </div>
+                  )}
+
                   <Button
                     size="sm"
                     variant="ghost"
@@ -186,7 +227,7 @@ export function Watchlist({ onStockSelect }: WatchlistProps) {
                       e.stopPropagation()
                       handleRemoveStock(stock.symbol)
                     }}
-                    className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="flex-shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <X size={18} strokeWidth={2} />
                   </Button>

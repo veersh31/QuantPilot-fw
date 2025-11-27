@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { TrendingUp, TrendingDown, DollarSign, Wallet, PieChart, AlertCircle, Clock } from 'lucide-react'
+import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 
 export function PortfolioOverview({ portfolio }: { portfolio: any[] }) {
   const [updatedPrices, setUpdatedPrices] = useState<{ [key: string]: number }>({})
@@ -57,6 +58,34 @@ export function PortfolioOverview({ portfolio }: { portfolio: any[] }) {
     const currentPrice = updatedPrices[stock.symbol] ?? stock.price ?? 0
     return sum + (stock.change || 0) * (stock.quantity || 1)
   }, 0)
+
+  // Calculate portfolio allocation
+  const allocationData = portfolio.map(stock => {
+    const currentPrice = updatedPrices[stock.symbol] ?? stock.price ?? 0
+    const stockValue = currentPrice * (stock.quantity || 1)
+    const percentage = totalValue > 0 ? (stockValue / totalValue) * 100 : 0
+
+    return {
+      name: stock.symbol,
+      value: stockValue,
+      percentage: percentage,
+      shares: stock.quantity || 1
+    }
+  }).sort((a, b) => b.value - a.value) // Sort by value descending
+
+  // Colors for pie chart
+  const COLORS = [
+    'var(--color-chart-1)',
+    'var(--color-chart-2)',
+    'var(--color-chart-3)',
+    'var(--color-chart-4)',
+    'var(--color-chart-5)',
+    '#8884d8',
+    '#82ca9d',
+    '#ffc658',
+    '#ff8042',
+    '#a4de6c'
+  ]
 
   return (
     <Card>
@@ -140,6 +169,99 @@ export function PortfolioOverview({ portfolio }: { portfolio: any[] }) {
 
             {loading && (
               <p className="text-xs text-muted-foreground text-center">Updating prices...</p>
+            )}
+
+            {/* Portfolio Diversification Pie Chart */}
+            {portfolio.length > 0 && (
+              <Card className="mt-6 border-blue-500/20 bg-gradient-to-br from-blue-500/5 to-background">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <PieChart size={20} className="text-blue-500" />
+                    Portfolio Allocation
+                  </CardTitle>
+                  <CardDescription>Distribution by position value</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Pie Chart */}
+                    <div className="h-[300px] flex items-center justify-center">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RechartsPieChart>
+                          <Pie
+                            data={allocationData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({name, percentage}) => `${name} ${percentage.toFixed(1)}%`}
+                            outerRadius={100}
+                            fill="#8884d8"
+                            dataKey="value"
+                            animationDuration={800}
+                          >
+                            {allocationData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{
+                              background: 'hsl(var(--card))',
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '8px',
+                              padding: '12px',
+                              color: 'var(--color-card-foreground)'
+                            }}
+                            formatter={(value: any) => [`$${value.toFixed(2)}`, 'Value']}
+                          />
+                        </RechartsPieChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Allocation Table */}
+                    <div className="space-y-2">
+                      <div className="text-sm font-semibold text-muted-foreground mb-3">Holdings Breakdown</div>
+                      <div className="space-y-2 max-h-[260px] overflow-y-auto pr-2">
+                        {allocationData.map((item, index) => (
+                          <div
+                            key={item.name}
+                            className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="w-4 h-4 rounded-full flex-shrink-0"
+                                style={{ background: COLORS[index % COLORS.length] }}
+                              />
+                              <div>
+                                <p className="font-bold text-sm">{item.name}</p>
+                                <p className="text-xs text-muted-foreground">{item.shares} shares</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-bold text-sm">{item.percentage.toFixed(1)}%</p>
+                              <p className="text-xs text-muted-foreground">${item.value.toFixed(2)}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Diversification Score */}
+                      <div className="mt-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">Diversification</span>
+                          <span className="text-sm font-bold text-blue-500">
+                            {portfolio.length >= 10 ? 'Well Diversified' :
+                             portfolio.length >= 5 ? 'Moderate' :
+                             portfolio.length >= 3 ? 'Concentrated' : 'High Risk'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {portfolio.length} position{portfolio.length !== 1 ? 's' : ''} •
+                          {allocationData[0] ? ` Largest: ${allocationData[0].percentage.toFixed(1)}%` : ''}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             )}
           </div>
         )}

@@ -113,70 +113,100 @@ export function PredictionDashboard({ symbol }: PredictionDashboardProps) {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header Card */}
-      <Card className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-blue-500/20">
-        <CardHeader>
+    <div className="space-y-6 animate-in fade-in duration-700">
+      {/* Header Card - Modern Glassmorphism */}
+      <Card className="relative overflow-hidden border-none shadow-2xl bg-gradient-to-br from-blue-500/20 via-purple-500/20 to-pink-500/20 backdrop-blur-xl">
+        {/* Animated background gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-purple-600/10 to-pink-600/10 animate-pulse" />
+
+        <CardHeader className="relative">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <Brain className="text-blue-500" size={24} />
-                ML Price Predictions for {symbol}
+              <CardTitle className="flex items-center gap-3 text-2xl">
+                <div className="p-2 rounded-xl bg-blue-500/20 backdrop-blur-sm">
+                  <Brain className="text-blue-400" size={28} />
+                </div>
+                <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                  ML Price Predictions for {symbol}
+                </span>
               </CardTitle>
-              <CardDescription className="mt-2">
-                Ensemble of {Object.keys(preds.modelPerformances).length} trained ML models • {dataPoints} data points
+              <CardDescription className="mt-3 text-base">
+                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-muted/50 backdrop-blur-sm">
+                  Ensemble of {Object.keys(preds.modelPerformances).length} trained ML models • {dataPoints} data points
+                </span>
               </CardDescription>
             </div>
-            <Button onClick={fetchPredictions} variant="outline" size="sm">
+            <Button
+              onClick={fetchPredictions}
+              variant="outline"
+              size="sm"
+              className="hover:scale-105 transition-transform duration-200 hover:shadow-lg"
+            >
               Refresh
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="relative">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Current Price</p>
-              <p className="text-3xl font-bold">${currentPrice.toFixed(2)}</p>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground font-medium">Current Price</p>
+              <p className="text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+                ${currentPrice.toFixed(2)}
+              </p>
             </div>
-            <div className={`px-4 py-2 rounded-lg ${getRecommendationColor(preds.recommendation)}`}>
-              <p className="text-xs font-semibold opacity-70">ML RECOMMENDATION</p>
-              <p className="text-lg font-bold">{preds.recommendation.replace('_', ' ')}</p>
+            <div className={`px-6 py-3 rounded-xl ${getRecommendationColor(preds.recommendation)} shadow-lg transform hover:scale-105 transition-all duration-300`}>
+              <p className="text-xs font-semibold opacity-70 tracking-wider">ML RECOMMENDATION</p>
+              <p className="text-xl font-bold mt-1">{preds.recommendation.replace('_', ' ')}</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Price Predictions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Next Day */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Target size={16} className="text-blue-500" />
+        <Card className="relative group hover:shadow-2xl transition-all duration-300 border-blue-500/30 bg-gradient-to-br from-blue-500/5 to-background overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 via-blue-500/0 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <CardHeader className="relative">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-blue-500/20">
+                <Target size={18} className="text-blue-500" />
+              </div>
               Next Day
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
+          <CardContent className="relative">
+            <div className="space-y-4">
               <div>
-                <p className="text-2xl font-bold flex items-center gap-2">
+                <p className="text-3xl font-bold flex items-center gap-2">
                   ${nextDay.predictedPrice.toFixed(2)}
                   {nextDayReturn > 0 ? (
-                    <TrendingUp className="text-chart-1" size={20} />
+                    <TrendingUp className="text-chart-1 animate-pulse" size={24} />
                   ) : (
-                    <TrendingDown className="text-destructive" size={20} />
+                    <TrendingDown className="text-destructive animate-pulse" size={24} />
                   )}
                 </p>
-                <p className={`text-sm font-semibold ${nextDayReturn >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
+                <p className={`text-base font-bold mt-1 ${nextDayReturn >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
                   {nextDayReturn >= 0 ? '+' : ''}{nextDayReturn.toFixed(2)}%
                 </p>
               </div>
-              <div className="text-xs space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Confidence:</span>
-                  <span className="font-semibold">{(nextDay.confidence * 100).toFixed(0)}%</span>
+
+              {/* Animated Confidence Bar */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground font-medium">Confidence</span>
+                  <span className="font-bold">{(nextDay.confidence * 100).toFixed(0)}%</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="h-2 bg-muted/30 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full transition-all duration-1000 ease-out"
+                    style={{ width: `${nextDay.confidence * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-border/50">
+                <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Range:</span>
                   <span className="font-semibold">
                     ${nextDay.lowerBound.toFixed(2)} - ${nextDay.upperBound.toFixed(2)}
@@ -188,34 +218,48 @@ export function PredictionDashboard({ symbol }: PredictionDashboardProps) {
         </Card>
 
         {/* Next Week */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Activity size={16} className="text-purple-500" />
+        <Card className="relative group hover:shadow-2xl transition-all duration-300 border-purple-500/30 bg-gradient-to-br from-purple-500/5 to-background overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-500/0 via-purple-500/0 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <CardHeader className="relative">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-purple-500/20">
+                <Activity size={18} className="text-purple-500" />
+              </div>
               Next Week (5 days)
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
+          <CardContent className="relative">
+            <div className="space-y-4">
               <div>
-                <p className="text-2xl font-bold flex items-center gap-2">
+                <p className="text-3xl font-bold flex items-center gap-2">
                   ${nextWeek.predictedPrice.toFixed(2)}
                   {nextWeekReturn > 0 ? (
-                    <TrendingUp className="text-chart-1" size={20} />
+                    <TrendingUp className="text-chart-1 animate-pulse" size={24} />
                   ) : (
-                    <TrendingDown className="text-destructive" size={20} />
+                    <TrendingDown className="text-destructive animate-pulse" size={24} />
                   )}
                 </p>
-                <p className={`text-sm font-semibold ${nextWeekReturn >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
+                <p className={`text-base font-bold mt-1 ${nextWeekReturn >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
                   {nextWeekReturn >= 0 ? '+' : ''}{nextWeekReturn.toFixed(2)}%
                 </p>
               </div>
-              <div className="text-xs space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Confidence:</span>
-                  <span className="font-semibold">{(nextWeek.confidence * 100).toFixed(0)}%</span>
+
+              {/* Animated Confidence Bar */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground font-medium">Confidence</span>
+                  <span className="font-bold">{(nextWeek.confidence * 100).toFixed(0)}%</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="h-2 bg-muted/30 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-purple-500 to-purple-400 rounded-full transition-all duration-1000 ease-out"
+                    style={{ width: `${nextWeek.confidence * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-border/50">
+                <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Range:</span>
                   <span className="font-semibold">
                     ${nextWeek.lowerBound.toFixed(2)} - ${nextWeek.upperBound.toFixed(2)}
@@ -227,34 +271,48 @@ export function PredictionDashboard({ symbol }: PredictionDashboardProps) {
         </Card>
 
         {/* Next Month */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <BarChart3 size={16} className="text-orange-500" />
+        <Card className="relative group hover:shadow-2xl transition-all duration-300 border-orange-500/30 bg-gradient-to-br from-orange-500/5 to-background overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-orange-500/0 via-orange-500/0 to-orange-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <CardHeader className="relative">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-orange-500/20">
+                <BarChart3 size={18} className="text-orange-500" />
+              </div>
               Next Month (20 days)
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
+          <CardContent className="relative">
+            <div className="space-y-4">
               <div>
-                <p className="text-2xl font-bold flex items-center gap-2">
+                <p className="text-3xl font-bold flex items-center gap-2">
                   ${nextMonth.predictedPrice.toFixed(2)}
                   {nextMonthReturn > 0 ? (
-                    <TrendingUp className="text-chart-1" size={20} />
+                    <TrendingUp className="text-chart-1 animate-pulse" size={24} />
                   ) : (
-                    <TrendingDown className="text-destructive" size={20} />
+                    <TrendingDown className="text-destructive animate-pulse" size={24} />
                   )}
                 </p>
-                <p className={`text-sm font-semibold ${nextMonthReturn >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
+                <p className={`text-base font-bold mt-1 ${nextMonthReturn >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
                   {nextMonthReturn >= 0 ? '+' : ''}{nextMonthReturn.toFixed(2)}%
                 </p>
               </div>
-              <div className="text-xs space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Confidence:</span>
-                  <span className="font-semibold">{(nextMonth.confidence * 100).toFixed(0)}%</span>
+
+              {/* Animated Confidence Bar */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground font-medium">Confidence</span>
+                  <span className="font-bold">{(nextMonth.confidence * 100).toFixed(0)}%</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="h-2 bg-muted/30 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-orange-500 to-orange-400 rounded-full transition-all duration-1000 ease-out"
+                    style={{ width: `${nextMonth.confidence * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-border/50">
+                <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Range:</span>
                   <span className="font-semibold">
                     ${nextMonth.lowerBound.toFixed(2)} - ${nextMonth.upperBound.toFixed(2)}
@@ -325,23 +383,25 @@ export function PredictionDashboard({ symbol }: PredictionDashboardProps) {
       </Card>
 
       {/* Feature Importance */}
-      <Card>
+      <Card className="border-blue-500/20 hover:shadow-xl transition-shadow duration-300">
         <CardHeader>
-          <CardTitle className="text-base">Top Predictive Features</CardTitle>
+          <CardTitle className="text-lg">Top Predictive Features</CardTitle>
           <CardDescription>Most important factors influencing the prediction</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
+          <div className="space-y-3">
             {preds.featureImportance.slice(0, 10).map((feature: any, idx: number) => (
-              <div key={idx} className="flex items-center gap-2">
-                <div className="w-32 text-xs text-muted-foreground truncate">{feature.feature}</div>
-                <div className="flex-1 bg-muted rounded-full h-2">
+              <div key={idx} className="group">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="text-sm font-medium text-foreground/90 truncate max-w-[60%]">{feature.feature}</div>
+                  <div className="text-sm font-bold text-blue-500">{(feature.importance * 100).toFixed(1)}%</div>
+                </div>
+                <div className="h-2.5 bg-muted/30 rounded-full overflow-hidden">
                   <div
-                    className="bg-blue-500 h-2 rounded-full"
+                    className="h-full bg-gradient-to-r from-blue-500 via-blue-400 to-blue-300 rounded-full transition-all duration-1000 ease-out group-hover:from-blue-600 group-hover:via-blue-500 group-hover:to-blue-400"
                     style={{ width: `${feature.importance * 100}%` }}
                   />
                 </div>
-                <div className="w-12 text-xs text-right">{(feature.importance * 100).toFixed(1)}%</div>
               </div>
             ))}
           </div>

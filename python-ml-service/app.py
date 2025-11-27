@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
+import time
 
 from feature_engineering import engineer_dataset, normalize_features, extract_features
 from models import MLEnsemble, TimeSeriesModels, evaluate_model
@@ -26,6 +27,52 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def fetch_stock_data_with_retry(symbol: str, start_date: datetime, end_date: datetime, max_retries: int = 3) -> pd.DataFrame:
+    """
+    Fetch stock data with retry logic and better error handling
+    """
+    for attempt in range(max_retries):
+        try:
+            # Create ticker with proper session
+            ticker = yf.Ticker(symbol)
+
+            # Fetch data with period instead of dates (more reliable)
+            # Using period='2y' is often more reliable than start/end dates
+            df = ticker.history(period='2y', interval='1d')
+
+            if df.empty:
+                # Try alternative approach with explicit dates
+                df = ticker.history(start=start_date, end=end_date)
+
+            if not df.empty:
+                return df
+
+            # If still empty, wait and retry
+            if attempt < max_retries - 1:
+                wait_time = (attempt + 1) * 2  # Exponential backoff
+                print(f"   ⚠ No data received for {symbol}, retrying in {wait_time}s... (attempt {attempt + 1}/{max_retries})")
+                time.sleep(wait_time)
+            else:
+                raise ValueError(f"No data available for {symbol}. Please verify the symbol is correct and actively traded.")
+
+        except Exception as e:
+            if attempt < max_retries - 1:
+                wait_time = (attempt + 1) * 2
+                print(f"   ⚠ Error fetching {symbol}: {str(e)}, retrying in {wait_time}s... (attempt {attempt + 1}/{max_retries})")
+                time.sleep(wait_time)
+            else:
+                # On final attempt, provide helpful error message
+                error_msg = str(e)
+                if "delisted" in error_msg.lower() or "no timezone" in error_msg.lower():
+                    raise ValueError(f"Symbol {symbol} may be delisted or invalid. Please verify the ticker symbol.")
+                elif "json" in error_msg.lower() or "Expecting value" in error_msg.lower():
+                    raise ValueError(f"Yahoo Finance API error for {symbol}. This is usually temporary - please try again in a moment.")
+                else:
+                    raise ValueError(f"Failed to fetch data for {symbol}: {error_msg}")
+
+    raise ValueError(f"Failed to fetch data for {symbol} after {max_retries} attempts")
 
 
 class PredictionRequest(BaseModel):
@@ -85,8 +132,7 @@ async def predict(request: PredictionRequest):
         end_date = datetime.now()
         start_date = end_date - timedelta(days=730)  # 2 years
 
-        ticker = yf.Ticker(symbol)
-        df = ticker.history(start=start_date, end=end_date)
+        df = fetch_stock_data_with_retry(symbol, start_date, end_date)
 
         if df.empty or len(df) < 250:
             raise HTTPException(
@@ -106,8 +152,7 @@ async def predict(request: PredictionRequest):
         spy_df = None
         if symbol != 'SPY':
             try:
-                spy_ticker = yf.Ticker('SPY')
-                spy_df = spy_ticker.history(start=start_date, end=end_date)
+                spy_df = fetch_stock_data_with_retry('SPY', start_date, end_date, max_retries=2)
                 if not spy_df.empty:
                     spy_df = spy_df.reset_index()
                     spy_df.columns = [col.lower() for col in spy_df.columns]
