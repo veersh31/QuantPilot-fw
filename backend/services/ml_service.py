@@ -147,37 +147,102 @@ class MLService:
                 'next_month': ts_next_month['ensemble']
             }
 
-            # Combine predictions
-            # ML ensemble predicts 1-day return, convert to price
-            next_day_price_ml = current_price * (1 + ensemble_pred_return)
-            next_day_price_ts = ts_predictions.get('next_day', current_price)
-            next_day_price = (next_day_price_ml + next_day_price_ts) / 2
+            # Calculate historical volatility for realistic bounds
+            returns = df['close'].pct_change().dropna()
+            daily_vol = returns.std()  # Daily volatility
 
-            # Use time series models for longer timeframes
-            next_week_price = ts_predictions.get('next_week', current_price)
-            next_month_price = ts_predictions.get('next_month', current_price)
+            # Clip ML ensemble prediction to realistic range (±2 standard deviations)
+            # For most stocks, 2-sigma daily move is rare but possible
+            max_realistic_return = 2.5 * daily_vol
+            min_realistic_return = -2.5 * daily_vol
+
+            # Clip the ensemble prediction
+            ensemble_pred_return_clipped = np.clip(
+                ensemble_pred_return,
+                min_realistic_return,
+                max_realistic_return
+            )
+
+            logger.info(f"ML predicted return: {ensemble_pred_return:.4f}, clipped to: {ensemble_pred_return_clipped:.4f}")
+            logger.info(f"Daily volatility: {daily_vol:.4f}, max realistic move: ±{max_realistic_return:.4f}")
+
+            # Combine predictions with conservative weighting
+            # ML ensemble predicts 1-day return, convert to price
+            next_day_price_ml = current_price * (1 + ensemble_pred_return_clipped)
+            next_day_price_ts = ts_predictions.get('next_day', current_price)
+
+            # Cap time series prediction to similar realistic bounds
+            ts_return = (next_day_price_ts - current_price) / current_price
+            ts_return_clipped = np.clip(ts_return, min_realistic_return, max_realistic_return)
+            next_day_price_ts_clipped = current_price * (1 + ts_return_clipped)
+
+            # Weighted average: favor ML model but blend with time series
+            next_day_price = (next_day_price_ml * 0.6 + next_day_price_ts_clipped * 0.4)
+
+            # Add mean reversion component - if prediction is extreme, pull it back
+            # Calculate recent average price (20-day SMA)
+            sma_20 = df['close'].tail(20).mean()
+            deviation_from_mean = (next_day_price - sma_20) / sma_20
+
+            # If prediction deviates more than 2% from 20-day average, apply gentle mean reversion
+            if abs(deviation_from_mean) > 0.02:
+                mean_reversion_weight = min(abs(deviation_from_mean) * 2, 0.15)  # Max 15% weight
+                next_day_price = next_day_price * (1 - mean_reversion_weight) + sma_20 * mean_reversion_weight
+                logger.info(f"Applied mean reversion: deviation {deviation_from_mean:.2%}, weight {mean_reversion_weight:.2%}")
+
+            # Use time series models for longer timeframes with realistic bounds
+            # For weekly: allow up to 3.5 sigma (5 trading days)
+            max_week_return = 3.5 * daily_vol * np.sqrt(5)
+            min_week_return = -3.5 * daily_vol * np.sqrt(5)
+
+            next_week_price_raw = ts_predictions.get('next_week', current_price)
+            week_return = (next_week_price_raw - current_price) / current_price
+            week_return_clipped = np.clip(week_return, min_week_return, max_week_return)
+            next_week_price = current_price * (1 + week_return_clipped)
+
+            # For monthly: allow up to 4 sigma (21 trading days)
+            max_month_return = 4.0 * daily_vol * np.sqrt(21)
+            min_month_return = -4.0 * daily_vol * np.sqrt(21)
+
+            next_month_price_raw = ts_predictions.get('next_month', current_price)
+            month_return = (next_month_price_raw - current_price) / current_price
+            month_return_clipped = np.clip(month_return, min_month_return, max_month_return)
+            next_month_price = current_price * (1 + month_return_clipped)
+
+            # Calculate realistic confidence intervals based on volatility
+            # Using 1.5 standard deviations for ~86% confidence interval
+            day_lower = current_price * (1 + ((next_day_price - current_price) / current_price) - 1.5 * daily_vol)
+            day_upper = current_price * (1 + ((next_day_price - current_price) / current_price) + 1.5 * daily_vol)
+
+            week_vol = daily_vol * np.sqrt(5)
+            week_lower = current_price * (1 + ((next_week_price - current_price) / current_price) - 1.5 * week_vol)
+            week_upper = current_price * (1 + ((next_week_price - current_price) / current_price) + 1.5 * week_vol)
+
+            month_vol = daily_vol * np.sqrt(21)
+            month_lower = current_price * (1 + ((next_month_price - current_price) / current_price) - 1.5 * month_vol)
+            month_upper = current_price * (1 + ((next_month_price - current_price) / current_price) + 1.5 * month_vol)
 
             predictions = {
                 "nextDay": {
                     "predictedPrice": float(next_day_price),
                     "predictedReturn": float(((next_day_price / current_price) - 1) * 100),
-                    "confidence": 0.75,
-                    "lowerBound": float(next_day_price * 0.98),
-                    "upperBound": float(next_day_price * 1.02)
+                    "confidence": 0.70,  # More conservative confidence
+                    "lowerBound": float(max(day_lower, current_price * 0.97)),  # Floor at -3%
+                    "upperBound": float(min(day_upper, current_price * 1.03))   # Cap at +3%
                 },
                 "nextWeek": {
                     "predictedPrice": float(next_week_price),
                     "predictedReturn": float(((next_week_price / current_price) - 1) * 100),
-                    "confidence": 0.68,
-                    "lowerBound": float(next_week_price * 0.96),
-                    "upperBound": float(next_week_price * 1.04)
+                    "confidence": 0.60,  # Lower confidence for longer horizon
+                    "lowerBound": float(max(week_lower, current_price * 0.94)),  # Floor at -6%
+                    "upperBound": float(min(week_upper, current_price * 1.06))   # Cap at +6%
                 },
                 "nextMonth": {
                     "predictedPrice": float(next_month_price),
                     "predictedReturn": float(((next_month_price / current_price) - 1) * 100),
-                    "confidence": 0.55,
-                    "lowerBound": float(next_month_price * 0.93),
-                    "upperBound": float(next_month_price * 1.07)
+                    "confidence": 0.50,  # Even lower confidence for monthly
+                    "lowerBound": float(max(month_lower, current_price * 0.88)),  # Floor at -12%
+                    "upperBound": float(min(month_upper, current_price * 1.12))   # Cap at +12%
                 }
             }
 
@@ -205,24 +270,29 @@ class MLService:
                 feature_importance.sort(key=lambda x: x['importance'], reverse=True)
                 feature_importance = feature_importance[:10]  # Top 10
 
-            # Generate recommendation
-            avg_return = (predictions['nextDay']['predictedReturn'] + predictions['nextWeek']['predictedReturn']) / 2
+            # Generate recommendation with more conservative thresholds
+            # Weight short-term prediction more heavily
+            avg_return = (predictions['nextDay']['predictedReturn'] * 0.6 +
+                         predictions['nextWeek']['predictedReturn'] * 0.4)
 
-            if avg_return > 3:
+            # Consider volatility in recommendation - higher vol means more caution
+            risk_adjusted_return = avg_return / (daily_vol * 100)  # Return per unit of volatility
+
+            if avg_return > 2.0 and risk_adjusted_return > 0.5:
                 recommendation = "STRONG_BUY"
-                analysis = f"Strong upward trend predicted with {avg_return:.1f}% expected return"
-            elif avg_return > 1:
+                analysis = f"Strong upward trend with {avg_return:.1f}% expected return. Model confidence: {predictions['nextDay']['confidence']*100:.0f}%"
+            elif avg_return > 0.8:
                 recommendation = "BUY"
-                analysis = f"Positive outlook with {avg_return:.1f}% expected return"
-            elif avg_return > -1:
+                analysis = f"Positive momentum with {avg_return:.1f}% expected return. Consider entry point based on technical levels"
+            elif avg_return > -0.8:
                 recommendation = "HOLD"
-                analysis = f"Stable outlook with {avg_return:.1f}% expected return"
-            elif avg_return > -3:
+                analysis = f"Neutral outlook with {avg_return:.1f}% expected return. Wait for clearer signals"
+            elif avg_return > -2.0:
                 recommendation = "SELL"
-                analysis = f"Negative trend with {avg_return:.1f}% expected return"
+                analysis = f"Weakness detected with {avg_return:.1f}% expected decline. Consider reducing exposure"
             else:
                 recommendation = "STRONG_SELL"
-                analysis = f"Strong downward trend with {avg_return:.1f}% expected return"
+                analysis = f"Strong downward pressure with {avg_return:.1f}% expected decline. Risk management suggested"
 
             # Backtesting
             logger.info("Running backtest...")

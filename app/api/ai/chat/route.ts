@@ -253,7 +253,7 @@ When discussing news, reference these actual headlines and their sentiment.
 
       mlContext = `
 🤖 MACHINE LEARNING PRICE PREDICTIONS FOR ${targetStock}:
-Current Price: $${mlPredictions.current_price}
+Current Price: $${mlPredictions.currentPrice}
 `
 
       if (pred.nextDay) {
