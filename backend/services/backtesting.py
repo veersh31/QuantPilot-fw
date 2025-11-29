@@ -5,7 +5,7 @@ Professional Backtesting Engine for ML Trading Strategy
 import numpy as np
 import pandas as pd
 from typing import Dict, List
-from models import MLEnsemble
+from .models import MLEnsemble
 
 
 class Backtester:

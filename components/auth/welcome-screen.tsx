@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { TrendingUp, BarChart3, Shield, Zap } from 'lucide-react'
+import { TrendingUp, BarChart3, Zap } from 'lucide-react'
 import { UserProfile } from '@/lib/types/user'
 
 interface WelcomeScreenProps {
@@ -39,11 +39,9 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
       id: `user-${Date.now()}`,
       username: formData.username,
       email: formData.email,
-      tradingMode: 'paper', // Default to paper trading
       createdAt: new Date().toISOString(),
       lastLogin: new Date().toISOString(),
       preferences: {
-        defaultMode: 'paper',
         theme: 'system',
         notifications: true
       }
@@ -117,13 +115,13 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
             Welcome to <span className="text-primary">QuantPilot</span>
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Your intelligent trading companion with AI-powered insights,
-            real-time analytics, and risk-free paper trading.
+            Your intelligent trading companion with AI-powered insights
+            and real-time analytics.
           </p>
         </div>
 
         {/* Features Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
           <Card>
             <CardHeader>
               <div className="p-2 rounded-lg bg-chart-1/10 w-fit mb-2">
@@ -135,21 +133,6 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
               <p className="text-sm text-muted-foreground">
                 Industry-standard technical indicators including RSI, MACD, Bollinger Bands,
                 and more with real market data.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="p-2 rounded-lg bg-blue-500/10 w-fit mb-2">
-                <Shield className="text-blue-500" size={24} />
-              </div>
-              <CardTitle className="text-lg">Paper Trading</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Practice trading strategies with virtual money using real market prices.
-                Zero risk, maximum learning.
               </p>
             </CardContent>
           </Card>

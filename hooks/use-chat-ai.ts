@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { apiClient } from '@/lib/api-client'
 
 // Extract stock symbols from user message (e.g., AAPL, MSFT, GOOGL, or "apple", "amazon")
 function extractStockSymbols(message: string): string[] {
@@ -82,45 +83,25 @@ export function useChatWithAI() {
         let mlPredictions = null
         if (targetStock) {
           try {
-            // Call the Next.js ML API route which forwards to Python service
-            // This works both locally and on Vercel (if ML service is deployed)
-            const mlResponse = await fetch('/api/ml/predict', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ symbol: targetStock }),
-            })
-            if (mlResponse.ok) {
-              const data = await mlResponse.json()
-              mlPredictions = data.predictions
-            }
+            const data = await apiClient.post('/ml/predict', { symbol: targetStock })
+            mlPredictions = data.predictions
           } catch (err) {
             console.log('ML predictions not available - ML service may not be running')
           }
         }
 
-        const response = await fetch('/api/ai/chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            message: userMessage,
-            portfolio,
-            selectedStock,
-            conversationHistory: conversationHistory.map(msg => ({
-              role: msg.role,
-              content: msg.content
-            })),
-            mlPredictions,
-            timestamp: new Date().toISOString(),
-          }),
+        const data = await apiClient.post<{ response: string }>('/ai/chat', {
+          message: userMessage,
+          portfolio,
+          selectedStock,
+          conversationHistory: conversationHistory.map(msg => ({
+            role: msg.role,
+            content: msg.content
+          })),
+          mlPredictions,
+          timestamp: new Date().toISOString(),
         })
 
-        if (!response.ok) {
-          throw new Error('Failed to get AI response')
-        }
-
-        const data = await response.json()
         return data.response
       } catch (error) {
         console.error('Error calling AI API:', error)

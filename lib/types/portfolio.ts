@@ -92,18 +92,6 @@ export interface WashSaleWarning {
   daysFromSale: number
 }
 
-export interface PaperTradingAccount {
-  accountId: string
-  name: string
-  startingCash: number
-  currentCash: number
-  positions: Position[]
-  transactions: Transaction[]
-  summary: PortfolioSummary
-  createdAt: string
-  isActive: boolean
-}
-
 /**
  * Calculate position details from transactions
  */

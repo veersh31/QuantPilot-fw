@@ -16,7 +16,6 @@ QuantPilot is a comprehensive, professional-grade portfolio analytics platform t
 - **Real-time Portfolio Tracking** - Track your holdings with live price updates (60-second refresh)
 - **Performance Metrics** - Comprehensive analytics including total value, gains/losses, and returns
 - **Transaction Manager** - Record and track all buy/sell transactions with detailed history
-- **Paper Trading** - Practice trading strategies with virtual cash without risking real money
 - **CSV Export** - Export your portfolio data for external analysis
 
 ### 💰 Dividend Tracking
@@ -153,7 +152,7 @@ Navigate to `http://localhost:3000` in your browser.
 3. **Portfolio** - Holdings, performance, dividends, and rebalancing
 4. **Analysis** - Charts, metrics, comparison, risk tools, and news
 5. **ML Predictions** - Machine learning price forecasts
-6. **Account** - Paper trading, transactions, and tax reports
+6. **Account** - Transactions and tax reports
 
 ### Portfolio Sub-Tabs
 - **Holdings** - View and manage your stock positions
@@ -250,7 +249,6 @@ QuantPilot is for informational purposes only and should not be considered finan
 - [x] Portfolio rebalancing calculator
 - [x] ML price predictions
 - [x] AI trading advisor
-- [x] Paper trading mode
 - [x] Transaction management
 - [x] Tax reporting
 

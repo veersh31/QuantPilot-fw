@@ -36,7 +36,10 @@ export function StockSearch({ onStockSelect, onAddToPortfolio }: any) {
     const fetchStockData = async () => {
       setLoading(true)
       try {
-        const stockDataPromises = STOCK_SYMBOLS.map(async ({ symbol, name }) => {
+        const stocksData: (StockInfo | null)[] = []
+
+        // Fetch stocks sequentially with delay to avoid rate limiting
+        for (const { symbol, name } of STOCK_SYMBOLS) {
           try {
             const response = await fetch('/api/stocks/quote', {
               method: 'POST',
@@ -44,28 +47,35 @@ export function StockSearch({ onStockSelect, onAddToPortfolio }: any) {
               body: JSON.stringify({ symbol }),
             })
 
-            if (!response.ok) throw new Error('Failed to fetch')
+            if (!response.ok) {
+              // Silently skip failed stocks instead of throwing
+              stocksData.push(null)
+              continue
+            }
 
             const data = await response.json()
-            return {
+            stocksData.push({
               symbol: data.symbol,
               name,
               price: data.price,
               change: data.change,
               changePercent: parseFloat(data.changePercent),
-            }
-          } catch (error) {
-            console.error(`Error fetching ${symbol}:`, error)
-            return null
-          }
-        })
+            })
 
-        const stocksData = await Promise.all(stockDataPromises)
+            // Add small delay between requests to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 200))
+          } catch (error) {
+            // Silently skip failed stocks
+            stocksData.push(null)
+          }
+        }
+
         const validStocks = stocksData.filter((stock): stock is StockInfo => stock !== null)
         setStocks(validStocks)
         setResults(validStocks)
       } catch (error) {
-        console.error('Error fetching stock data:', error)
+        // Only log if there's a critical error
+        console.error('Critical error fetching stock data:', error)
       } finally {
         setLoading(false)
       }
@@ -115,11 +125,11 @@ export function StockSearch({ onStockSelect, onAddToPortfolio }: any) {
           // Show the exact match first, then other filtered results
           setResults([newStock, ...filtered.filter(s => s.symbol !== newStock.symbol)])
         } else {
-          // If fetch fails, just show filtered results
+          // If fetch fails, just show filtered results (silently)
           setResults(filtered)
         }
       } catch (error) {
-        console.error('Error searching stock:', error)
+        // Silently handle error and show filtered results
         setResults(filtered)
       } finally {
         setSearching(false)

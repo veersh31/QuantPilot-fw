@@ -88,10 +88,10 @@ export function PortfolioOverview({ portfolio }: { portfolio: any[] }) {
   ]
 
   return (
-    <Card>
+    <Card className="border-muted">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Wallet size={24} />
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <Wallet className="h-4 w-4" />
           Portfolio Overview
         </CardTitle>
         <CardDescription>
@@ -123,45 +123,45 @@ export function PortfolioOverview({ portfolio }: { portfolio: any[] }) {
             <p className="text-sm text-muted-foreground">Add stocks to your portfolio to get started</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <DollarSign size={16} />
-                  <p className="text-sm">Total Value</p>
+              <div className="p-4 rounded-lg bg-muted/50 border border-border">
+                <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                  <DollarSign className="h-4 w-4" />
+                  <p className="text-xs font-medium uppercase">Total Value</p>
                 </div>
                 <p className="text-2xl font-bold text-foreground">
                   ${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               </div>
 
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Cost Basis</p>
-                <p className="text-2xl font-bold text-muted-foreground">
+              <div className="p-4 rounded-lg bg-muted/50 border border-border">
+                <p className="text-xs font-medium text-muted-foreground uppercase mb-1">Cost Basis</p>
+                <p className="text-2xl font-bold">
                   ${costBasis.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               </div>
 
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Total Gain/Loss</p>
+              <div className="p-4 rounded-lg bg-muted/50 border border-border">
+                <p className="text-xs font-medium text-muted-foreground uppercase mb-1">Total Gain/Loss</p>
                 <div className="flex items-center gap-2">
-                  <p className={`text-2xl font-bold ${gainLoss >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
+                  <p className={`text-2xl font-bold ${gainLoss >= 0 ? 'text-emerald-600 dark:text-emerald-500' : 'text-red-600 dark:text-red-500'}`}>
                     {gainLoss >= 0 ? '+' : ''}${gainLoss.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                   {gainLoss >= 0 ? (
-                    <TrendingUp className="text-chart-1" size={20} />
+                    <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-500" />
                   ) : (
-                    <TrendingDown className="text-destructive" size={20} />
+                    <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-500" />
                   )}
                 </div>
-                <p className={`text-sm ${gainLoss >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
+                <p className={`text-sm mt-1 ${gainLoss >= 0 ? 'text-emerald-600 dark:text-emerald-500' : 'text-red-600 dark:text-red-500'}`}>
                   {gainLoss >= 0 ? '+' : ''}{gainLossPercent.toFixed(2)}%
                 </p>
               </div>
 
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Today's Change</p>
-                <p className={`text-2xl font-bold ${todayGainLoss >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
+              <div className="p-4 rounded-lg bg-muted/50 border border-border">
+                <p className="text-xs font-medium text-muted-foreground uppercase mb-1">Today's Change</p>
+                <p className={`text-2xl font-bold ${todayGainLoss >= 0 ? 'text-emerald-600 dark:text-emerald-500' : 'text-red-600 dark:text-red-500'}`}>
                   {todayGainLoss >= 0 ? '+' : ''}${todayGainLoss.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               </div>
@@ -173,10 +173,10 @@ export function PortfolioOverview({ portfolio }: { portfolio: any[] }) {
 
             {/* Portfolio Diversification Pie Chart */}
             {portfolio.length > 0 && (
-              <Card className="mt-6 border-blue-500/20 bg-gradient-to-br from-blue-500/5 to-background">
+              <Card className="border-muted">
                 <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <PieChart size={20} className="text-blue-500" />
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <PieChart className="h-4 w-4" />
                     Portfolio Allocation
                   </CardTitle>
                   <CardDescription>Distribution by position value</CardDescription>
@@ -191,12 +191,11 @@ export function PortfolioOverview({ portfolio }: { portfolio: any[] }) {
                             data={allocationData}
                             cx="50%"
                             cy="50%"
-                            labelLine={false}
-                            label={({name, percentage}) => `${name} ${percentage.toFixed(1)}%`}
-                            outerRadius={100}
+                            innerRadius={60}
+                            outerRadius={110}
                             fill="#8884d8"
                             dataKey="value"
-                            animationDuration={800}
+                            animationDuration={600}
                           >
                             {allocationData.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -208,30 +207,51 @@ export function PortfolioOverview({ portfolio }: { portfolio: any[] }) {
                               border: '1px solid hsl(var(--border))',
                               borderRadius: '8px',
                               padding: '12px',
-                              color: 'var(--color-card-foreground)'
+                              color: 'hsl(var(--card-foreground))'
                             }}
-                            formatter={(value: any) => [`$${value.toFixed(2)}`, 'Value']}
+                            formatter={(value: any, name: string, props: any) => [
+                              `$${Number(value).toFixed(2)} (${props.payload.percentage.toFixed(1)}%)`,
+                              props.payload.name
+                            ]}
+                          />
+                          <Legend
+                            verticalAlign="middle"
+                            align="right"
+                            layout="vertical"
+                            iconType="circle"
+                            formatter={(value, entry: any) => (
+                              <span className="text-sm">
+                                <span className="font-semibold">{value}</span>
+                                <span className="text-muted-foreground ml-2">
+                                  {entry.payload.percentage.toFixed(1)}%
+                                </span>
+                              </span>
+                            )}
+                            wrapperStyle={{
+                              paddingLeft: '20px',
+                              fontSize: '14px'
+                            }}
                           />
                         </RechartsPieChart>
                       </ResponsiveContainer>
                     </div>
 
                     {/* Allocation Table */}
-                    <div className="space-y-2">
-                      <div className="text-sm font-semibold text-muted-foreground mb-3">Holdings Breakdown</div>
+                    <div className="space-y-3">
+                      <div className="text-xs font-medium text-muted-foreground uppercase mb-3">Holdings Breakdown</div>
                       <div className="space-y-2 max-h-[260px] overflow-y-auto pr-2">
                         {allocationData.map((item, index) => (
                           <div
                             key={item.name}
-                            className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                            className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border hover:bg-muted/50 transition-colors"
                           >
                             <div className="flex items-center gap-3">
                               <div
-                                className="w-4 h-4 rounded-full flex-shrink-0"
+                                className="w-3 h-3 rounded-full flex-shrink-0"
                                 style={{ background: COLORS[index % COLORS.length] }}
                               />
                               <div>
-                                <p className="font-bold text-sm">{item.name}</p>
+                                <p className="font-semibold text-sm">{item.name}</p>
                                 <p className="text-xs text-muted-foreground">{item.shares} shares</p>
                               </div>
                             </div>
@@ -244,16 +264,21 @@ export function PortfolioOverview({ portfolio }: { portfolio: any[] }) {
                       </div>
 
                       {/* Diversification Score */}
-                      <div className="mt-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                      <div className="mt-4 p-4 rounded-lg bg-muted/50 border border-border">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">Diversification</span>
-                          <span className="text-sm font-bold text-blue-500">
+                          <span className="text-xs font-medium text-muted-foreground uppercase">Diversification</span>
+                          <span className={`text-sm font-bold ${
+                            portfolio.length >= 10 ? 'text-emerald-600 dark:text-emerald-500' :
+                            portfolio.length >= 5 ? 'text-primary' :
+                            portfolio.length >= 3 ? 'text-amber-600 dark:text-amber-500' :
+                            'text-red-600 dark:text-red-500'
+                          }`}>
                             {portfolio.length >= 10 ? 'Well Diversified' :
                              portfolio.length >= 5 ? 'Moderate' :
                              portfolio.length >= 3 ? 'Concentrated' : 'High Risk'}
                           </span>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="text-xs text-muted-foreground mt-2">
                           {portfolio.length} position{portfolio.length !== 1 ? 's' : ''} •
                           {allocationData[0] ? ` Largest: ${allocationData[0].percentage.toFixed(1)}%` : ''}
                         </p>

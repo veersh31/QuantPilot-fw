@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Newspaper, ExternalLink, Clock } from 'lucide-react'
+import { Newspaper, ExternalLink, Clock, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import { apiClient } from '@/lib/api-client'
 
 interface NewsItem {
   title: string
@@ -28,18 +31,7 @@ export function StockNews({ symbol }: StockNewsProps) {
 
       setLoading(true)
       try {
-        // Fetch real news from API
-        const response = await fetch('/api/stocks/news', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ symbol }),
-        })
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch news')
-        }
-
-        const data = await response.json()
+        const data = await apiClient.post<{ news: NewsItem[] }>('/stocks/news', { symbol })
         setNews(data.news || [])
       } catch (error) {
         console.error('Error fetching news:', error)
@@ -67,23 +59,38 @@ export function StockNews({ symbol }: StockNewsProps) {
     }
   }
 
-  const getSentimentColor = (sentiment?: string) => {
+  const getSentimentBadge = (sentiment?: string) => {
     switch (sentiment) {
       case 'positive':
-        return 'text-chart-1'
+        return (
+          <Badge variant="outline" className="border-emerald-500 text-emerald-600 dark:text-emerald-500 gap-1">
+            <TrendingUp className="h-3 w-3" />
+            Positive
+          </Badge>
+        )
       case 'negative':
-        return 'text-destructive'
+        return (
+          <Badge variant="outline" className="border-red-500 text-red-600 dark:text-red-500 gap-1">
+            <TrendingDown className="h-3 w-3" />
+            Negative
+          </Badge>
+        )
       default:
-        return 'text-muted-foreground'
+        return (
+          <Badge variant="outline" className="gap-1">
+            <Minus className="h-3 w-3" />
+            Neutral
+          </Badge>
+        )
     }
   }
 
   if (!symbol) {
     return (
-      <Card>
+      <Card className="border-muted">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Newspaper size={20} />
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <Newspaper className="h-4 w-4" />
             Market News
           </CardTitle>
           <CardDescription>Select a stock to view related news</CardDescription>
@@ -98,19 +105,19 @@ export function StockNews({ symbol }: StockNewsProps) {
   }
 
   return (
-    <Card>
+    <Card className="border-muted">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Newspaper size={20} />
-          {symbol} News
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <Newspaper className="h-4 w-4" />
+          {symbol} News & Analysis
         </CardTitle>
-        <CardDescription>Latest news and updates</CardDescription>
+        <CardDescription>Latest market news and updates</CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
           <div className="space-y-4">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="space-y-2">
+              <div key={i} className="p-4 rounded-lg bg-muted/30 border border-border space-y-3">
                 <Skeleton className="h-4 w-full" />
                 <Skeleton className="h-3 w-3/4" />
                 <Skeleton className="h-3 w-1/2" />
@@ -118,53 +125,50 @@ export function StockNews({ symbol }: StockNewsProps) {
             ))}
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {news.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">
                 No news available at the moment
               </p>
             ) : (
               news.map((item, index) => (
-                <div
-                  key={index}
-                  className="p-3 rounded-lg border border-border hover:bg-muted transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-sm leading-tight mb-1">
-                        {item.title}
-                      </h4>
-                      <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-                        {item.summary}
-                      </p>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span className="font-medium">{item.source}</span>
-                        <span className="flex items-center gap-1">
-                          <Clock size={12} />
-                          {getTimeAgo(item.publishedAt)}
-                        </span>
-                        {item.sentiment && (
-                          <span className={`font-medium ${getSentimentColor(item.sentiment)}`}>
-                            {item.sentiment}
+                <div key={index}>
+                  <div className="p-4 rounded-lg bg-muted/30 border border-border hover:bg-muted/50 transition-colors group">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <h4 className="font-semibold text-sm leading-tight group-hover:text-primary transition-colors">
+                          {item.title}
+                        </h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+                          {item.summary}
+                        </p>
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className="text-xs font-medium text-foreground">
+                            {item.source}
                           </span>
-                        )}
+                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            {getTimeAgo(item.publishedAt)}
+                          </span>
+                          {item.sentiment && getSentimentBadge(item.sentiment)}
+                        </div>
                       </div>
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-muted-foreground hover:text-primary transition-colors flex-shrink-0 p-1"
+                        onClick={(e) => {
+                          if (item.url === '#') {
+                            e.preventDefault()
+                          }
+                        }}
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
                     </div>
-                    <a
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                      onClick={(e) => {
-                        // Prevent navigation for demo links
-                        if (item.url === '#') {
-                          e.preventDefault()
-                        }
-                      }}
-                    >
-                      <ExternalLink size={16} />
-                    </a>
                   </div>
+                  {index < news.length - 1 && <Separator className="my-3" />}
                 </div>
               ))
             )}

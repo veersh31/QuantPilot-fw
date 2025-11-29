@@ -1,6 +1,6 @@
 'use client'
 
-import { BarChart3, Settings, Moon, Sun, LogOut, User, Shield, TrendingUp } from 'lucide-react'
+import { BarChart3, Settings, Moon, Sun, LogOut, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTheme } from 'next-themes'
 import { useEffect, useState } from 'react'
@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/auth-context'
 
 export function DashboardHeader() {
   const { theme, setTheme } = useTheme()
-  const { profile, isAuthenticated, currentMode, setCurrentMode, logout } = useAuth()
+  const { profile, isAuthenticated, logout } = useAuth()
   const [mounted, setMounted] = useState(false)
 
   // Avoid hydration mismatch
@@ -40,28 +40,6 @@ export function DashboardHeader() {
         <div className="flex items-center gap-3">
           {mounted && isAuthenticated && (
             <>
-              {/* Mode Switcher - Enhanced */}
-              <div className="hidden md:flex items-center gap-1 p-1 rounded-xl bg-muted/50 backdrop-blur-sm border border-border/50">
-                <Button
-                  variant={currentMode === 'paper' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setCurrentMode('paper')}
-                  className={`gap-2 text-xs transition-all duration-200 ${currentMode === 'paper' ? 'bg-gradient-to-r from-blue-500 to-blue-600 shadow-md' : 'hover:bg-muted'}`}
-                >
-                  <Shield size={14} />
-                  Paper Trading
-                </Button>
-                <Button
-                  variant={currentMode === 'real' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setCurrentMode('real')}
-                  className={`gap-2 text-xs transition-all duration-200 ${currentMode === 'real' ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 shadow-md' : 'hover:bg-muted'}`}
-                >
-                  <TrendingUp size={14} />
-                  Real Portfolio
-                </Button>
-              </div>
-
               {/* Theme Toggle - Enhanced */}
               <Button
                 variant="ghost"

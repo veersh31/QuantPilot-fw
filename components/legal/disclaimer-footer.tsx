@@ -1,6 +1,6 @@
 'use client'
 
-import { AlertTriangle, Database, TrendingUp, FileText } from 'lucide-react'
+import { AlertTriangle, Database, FileText } from 'lucide-react'
 
 export function DisclaimerFooter() {
   return (
@@ -36,7 +36,7 @@ export function DisclaimerFooter() {
           </div>
 
           {/* Additional Info Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 rounded-lg bg-muted/40 border border-border hover:border-primary/40 transition-colors">
               <div className="flex items-center gap-2 mb-2">
                 <Database className="text-primary" size={16} />
@@ -45,17 +45,6 @@ export function DisclaimerFooter() {
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Stock data provided by Yahoo Finance. Technical indicators calculated using industry-standard formulas.
                 AI powered by Groq LLM. Data may be delayed or inaccurate.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-lg bg-muted/40 border border-border hover:border-blue-500/40 transition-colors">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="text-blue-500" size={16} />
-                <h4 className="font-semibold text-foreground text-sm">Paper Trading</h4>
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Paper trading mode uses simulated money and does not reflect real market conditions including slippage,
-                fees, or order execution challenges. Real trading results may differ significantly.
               </p>
             </div>
 

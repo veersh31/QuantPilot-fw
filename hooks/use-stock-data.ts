@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { apiClient } from '@/lib/api-client'
 
 export interface StockData {
   symbol: string
@@ -29,15 +30,7 @@ export function useStockData(symbol: string | null) {
     setError(null)
 
     try {
-      const response = await fetch('/api/stocks/quote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol }),
-      })
-
-      if (!response.ok) throw new Error('Failed to fetch stock data')
-
-      const stockData = await response.json()
+      const stockData = await apiClient.post<StockData>('/stocks/quote', { symbol })
       setData(stockData)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')

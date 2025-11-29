@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { TrendingUp, TrendingDown, Activity, BarChart3, Loader2 } from 'lucide-react'
+import { TrendingUp, TrendingDown, Activity, BarChart3, Loader2, Minus } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
 import { TechnicalAnalysis } from '@/lib/technical-indicators'
+import { apiClient } from '@/lib/api-client'
 
 interface TechnicalIndicatorsProps {
   symbol: string
@@ -20,17 +23,7 @@ export function TechnicalIndicators({ symbol }: TechnicalIndicatorsProps) {
       setLoading(true)
       setError(null)
       try {
-        const response = await fetch('/api/indicators', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ symbol, days: 200 }),
-        })
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch indicators')
-        }
-
-        const data = await response.json()
+        const data = await apiClient.post<{ analysis: TechnicalAnalysis, currentPrice: number }>('/indicators', { symbol, days: 200 })
         setAnalysis(data.analysis)
         setCurrentPrice(data.currentPrice)
       } catch (err) {
@@ -46,16 +39,16 @@ export function TechnicalIndicators({ symbol }: TechnicalIndicatorsProps) {
 
   if (loading) {
     return (
-      <Card>
+      <Card className="border-muted">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity size={20} />
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
             Technical Indicators
           </CardTitle>
           <CardDescription>Real-time technical analysis for {symbol}</CardDescription>
         </CardHeader>
         <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="animate-spin" size={32} />
+          <Loader2 className="animate-spin text-muted-foreground" size={24} />
         </CardContent>
       </Card>
     )
@@ -63,10 +56,10 @@ export function TechnicalIndicators({ symbol }: TechnicalIndicatorsProps) {
 
   if (error || !analysis) {
     return (
-      <Card>
+      <Card className="border-muted">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity size={20} />
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
             Technical Indicators
           </CardTitle>
           <CardDescription>Real-time technical analysis for {symbol}</CardDescription>
@@ -78,72 +71,79 @@ export function TechnicalIndicators({ symbol }: TechnicalIndicatorsProps) {
     )
   }
 
-  const getSignalColor = (signal: string) => {
+  const getSignalBadge = (signal: string) => {
     if (signal === 'strong_buy' || signal === 'buy' || signal === 'bullish' || signal === 'oversold') {
-      return 'text-chart-1'
+      return (
+        <Badge className="bg-emerald-500 text-white border-emerald-600">
+          {signal.replace('_', ' ').toUpperCase()}
+        </Badge>
+      )
     } else if (signal === 'strong_sell' || signal === 'sell' || signal === 'bearish' || signal === 'overbought') {
-      return 'text-destructive'
+      return (
+        <Badge className="bg-red-500 text-white border-red-600">
+          {signal.replace('_', ' ').toUpperCase()}
+        </Badge>
+      )
     }
-    return 'text-muted-foreground'
-  }
-
-  const getSignalBgColor = (signal: string) => {
-    if (signal === 'strong_buy' || signal === 'buy' || signal === 'bullish' || signal === 'oversold') {
-      return 'bg-chart-1/10 border-chart-1'
-    } else if (signal === 'strong_sell' || signal === 'sell' || signal === 'bearish' || signal === 'overbought') {
-      return 'bg-destructive/10 border-destructive'
-    }
-    return 'bg-muted border-border'
+    return (
+      <Badge variant="outline">
+        {signal.replace('_', ' ').toUpperCase()}
+      </Badge>
+    )
   }
 
   const getSignalIcon = (signal: string) => {
     if (signal === 'strong_buy' || signal === 'buy' || signal === 'bullish' || signal === 'oversold') {
-      return <TrendingUp size={16} className="text-chart-1" />
+      return <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-500" />
     } else if (signal === 'strong_sell' || signal === 'sell' || signal === 'bearish' || signal === 'overbought') {
-      return <TrendingDown size={16} className="text-destructive" />
+      return <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-500" />
     }
-    return <Activity size={16} className="text-muted-foreground" />
+    return <Minus className="h-5 w-5 text-muted-foreground" />
   }
 
   return (
-    <Card>
+    <Card className="border-muted">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <BarChart3 size={20} />
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <BarChart3 className="h-4 w-4" />
           Technical Indicators
         </CardTitle>
         <CardDescription>Real-time technical analysis for {symbol}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
         {/* Overall Signal */}
-        <div className={`p-4 rounded-lg border-2 ${getSignalBgColor(analysis.overallSignal)}`}>
+        <div className="p-6 rounded-lg bg-muted/50 border-2 border-border">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-muted-foreground">Overall Signal</p>
-              <p className={`text-2xl font-bold ${getSignalColor(analysis.overallSignal)}`}>
-                {analysis.overallSignal.replace('_', ' ').toUpperCase()}
-              </p>
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase">Overall Signal</p>
+              {getSignalBadge(analysis.overallSignal)}
             </div>
-            <div className="text-4xl">
+            <div>
               {getSignalIcon(analysis.overallSignal)}
             </div>
           </div>
         </div>
 
         {/* RSI */}
-        <div className="p-4 rounded-lg border border-border bg-card space-y-2">
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold">RSI (Relative Strength Index)</p>
               <p className="text-xs text-muted-foreground">{analysis.rsi.description}</p>
             </div>
-            {getSignalIcon(analysis.rsi.signal)}
+            {getSignalBadge(analysis.rsi.signal)}
           </div>
           <div className="flex items-center gap-4">
             <div className="flex-1">
               <div className="h-2 bg-muted rounded-full overflow-hidden">
                 <div
-                  className={`h-full ${analysis.rsi.value < 30 ? 'bg-chart-1' : analysis.rsi.value > 70 ? 'bg-destructive' : 'bg-blue-500'}`}
+                  className={`h-full ${
+                    analysis.rsi.value < 30
+                      ? 'bg-emerald-500'
+                      : analysis.rsi.value > 70
+                      ? 'bg-red-500'
+                      : 'bg-primary'
+                  }`}
                   style={{ width: `${Math.min(analysis.rsi.value, 100)}%` }}
                 />
               </div>
@@ -154,54 +154,59 @@ export function TechnicalIndicators({ symbol }: TechnicalIndicatorsProps) {
                 <span>100</span>
               </div>
             </div>
-            <div className="text-right">
-              <p className={`text-2xl font-bold ${getSignalColor(analysis.rsi.signal)}`}>
+            <div className="text-right min-w-[60px]">
+              <p className="text-2xl font-bold">
                 {analysis.rsi.value.toFixed(1)}
-              </p>
-              <p className={`text-xs ${getSignalColor(analysis.rsi.signal)}`}>
-                {analysis.rsi.signal.toUpperCase()}
               </p>
             </div>
           </div>
         </div>
 
+        <Separator />
+
         {/* MACD */}
-        <div className="p-4 rounded-lg border border-border bg-card space-y-2">
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold">MACD</p>
               <p className="text-xs text-muted-foreground">{analysis.macd.description}</p>
             </div>
-            {getSignalIcon(analysis.macd.trend)}
+            {getSignalBadge(analysis.macd.trend)}
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <p className="text-xs text-muted-foreground">MACD</p>
-              <p className="text-sm font-semibold">{analysis.macd.macd.toFixed(3)}</p>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="p-3 rounded-lg bg-muted/30 border border-border">
+              <p className="text-xs text-muted-foreground mb-1">MACD</p>
+              <p className="text-sm font-bold">{analysis.macd.macd.toFixed(3)}</p>
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Signal</p>
-              <p className="text-sm font-semibold">{analysis.macd.signal.toFixed(3)}</p>
+            <div className="p-3 rounded-lg bg-muted/30 border border-border">
+              <p className="text-xs text-muted-foreground mb-1">Signal</p>
+              <p className="text-sm font-bold">{analysis.macd.signal.toFixed(3)}</p>
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Histogram</p>
-              <p className={`text-sm font-semibold ${analysis.macd.histogram > 0 ? 'text-chart-1' : 'text-destructive'}`}>
+            <div className="p-3 rounded-lg bg-muted/30 border border-border">
+              <p className="text-xs text-muted-foreground mb-1">Histogram</p>
+              <p className={`text-sm font-bold ${
+                analysis.macd.histogram > 0
+                  ? 'text-emerald-600 dark:text-emerald-500'
+                  : 'text-red-600 dark:text-red-500'
+              }`}>
                 {analysis.macd.histogram.toFixed(3)}
               </p>
             </div>
           </div>
         </div>
 
+        <Separator />
+
         {/* Bollinger Bands */}
-        <div className="p-4 rounded-lg border border-border bg-card space-y-2">
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold">Bollinger Bands</p>
               <p className="text-xs text-muted-foreground">{analysis.bollingerBands.description}</p>
             </div>
-            {getSignalIcon(analysis.bollingerBands.position)}
+            {getSignalBadge(analysis.bollingerBands.position)}
           </div>
-          <div className="space-y-1">
+          <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-xs text-muted-foreground">Upper Band</span>
               <span className="text-sm font-semibold">${analysis.bollingerBands.upper.toFixed(2)}</span>
@@ -214,9 +219,10 @@ export function TechnicalIndicators({ symbol }: TechnicalIndicatorsProps) {
               <span className="text-xs text-muted-foreground">Lower Band</span>
               <span className="text-sm font-semibold">${analysis.bollingerBands.lower.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between items-center pt-2 border-t border-border">
-              <span className="text-xs text-muted-foreground">Current Price</span>
-              <span className={`text-sm font-bold ${getSignalColor(analysis.bollingerBands.position)}`}>
+            <Separator className="my-2" />
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-muted-foreground font-medium">Current Price</span>
+              <span className="text-sm font-bold">
                 ${currentPrice.toFixed(2)}
               </span>
             </div>
@@ -227,78 +233,86 @@ export function TechnicalIndicators({ symbol }: TechnicalIndicatorsProps) {
           </div>
         </div>
 
+        <Separator />
+
         {/* Moving Averages */}
-        <div className="p-4 rounded-lg border border-border bg-card space-y-2">
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold">Moving Averages</p>
               <p className="text-xs text-muted-foreground">{analysis.movingAverages.description}</p>
             </div>
-            {getSignalIcon(analysis.movingAverages.trend)}
+            {getSignalBadge(analysis.movingAverages.trend)}
           </div>
-          <div className="space-y-1">
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-muted-foreground">SMA 20</span>
-              <span className="text-sm font-semibold">${analysis.movingAverages.sma20.toFixed(2)}</span>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 rounded-lg bg-muted/30 border border-border">
+              <p className="text-xs text-muted-foreground mb-1">SMA 20</p>
+              <p className="text-sm font-bold">${analysis.movingAverages.sma20.toFixed(2)}</p>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-muted-foreground">SMA 50</span>
-              <span className="text-sm font-semibold">${analysis.movingAverages.sma50.toFixed(2)}</span>
+            <div className="p-3 rounded-lg bg-muted/30 border border-border">
+              <p className="text-xs text-muted-foreground mb-1">SMA 50</p>
+              <p className="text-sm font-bold">${analysis.movingAverages.sma50.toFixed(2)}</p>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-muted-foreground">SMA 200</span>
-              <span className="text-sm font-semibold">
+            <div className="p-3 rounded-lg bg-muted/30 border border-border">
+              <p className="text-xs text-muted-foreground mb-1">SMA 200</p>
+              <p className="text-sm font-bold">
                 {analysis.movingAverages.sma200 > 0 ? `$${analysis.movingAverages.sma200.toFixed(2)}` : 'N/A'}
-              </span>
+              </p>
             </div>
-            <div className="flex justify-between items-center pt-2 border-t border-border">
-              <span className="text-xs text-muted-foreground">EMA 12</span>
-              <span className="text-sm font-semibold">${analysis.movingAverages.ema12.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-muted-foreground">EMA 26</span>
-              <span className="text-sm font-semibold">${analysis.movingAverages.ema26.toFixed(2)}</span>
+            <div className="p-3 rounded-lg bg-muted/30 border border-border">
+              <p className="text-xs text-muted-foreground mb-1">EMA 12</p>
+              <p className="text-sm font-bold">${analysis.movingAverages.ema12.toFixed(2)}</p>
             </div>
           </div>
         </div>
 
+        <Separator />
+
         {/* Stochastic Oscillator */}
-        <div className="p-4 rounded-lg border border-border bg-card space-y-2">
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold">Stochastic Oscillator</p>
               <p className="text-xs text-muted-foreground">{analysis.stochastic.description}</p>
             </div>
-            {getSignalIcon(analysis.stochastic.signal)}
+            {getSignalBadge(analysis.stochastic.signal)}
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-muted-foreground">%K</p>
-              <p className={`text-xl font-bold ${getSignalColor(analysis.stochastic.signal)}`}>
+            <div className="p-4 rounded-lg bg-muted/30 border border-border">
+              <p className="text-xs text-muted-foreground mb-1">%K</p>
+              <p className="text-2xl font-bold">
                 {analysis.stochastic.k.toFixed(1)}
               </p>
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground">%D</p>
-              <p className="text-xl font-bold">{analysis.stochastic.d.toFixed(1)}</p>
+            <div className="p-4 rounded-lg bg-muted/30 border border-border">
+              <p className="text-xs text-muted-foreground mb-1">%D</p>
+              <p className="text-2xl font-bold">{analysis.stochastic.d.toFixed(1)}</p>
             </div>
           </div>
-          <div className="h-2 bg-muted rounded-full overflow-hidden">
-            <div
-              className={`h-full ${analysis.stochastic.k < 20 ? 'bg-chart-1' : analysis.stochastic.k > 80 ? 'bg-destructive' : 'bg-blue-500'}`}
-              style={{ width: `${Math.min(analysis.stochastic.k, 100)}%` }}
-            />
-          </div>
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>0</span>
-            <span>20</span>
-            <span>80</span>
-            <span>100</span>
+          <div className="space-y-2">
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div
+                className={`h-full ${
+                  analysis.stochastic.k < 20
+                    ? 'bg-emerald-500'
+                    : analysis.stochastic.k > 80
+                    ? 'bg-red-500'
+                    : 'bg-primary'
+                }`}
+                style={{ width: `${Math.min(analysis.stochastic.k, 100)}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>0</span>
+              <span>20</span>
+              <span>80</span>
+              <span>100</span>
+            </div>
           </div>
         </div>
 
         {/* Timestamp */}
-        <p className="text-xs text-muted-foreground text-center">
+        <p className="text-xs text-muted-foreground text-center pt-4">
           Last updated: {new Date(analysis.timestamp).toLocaleString()}
         </p>
       </CardContent>

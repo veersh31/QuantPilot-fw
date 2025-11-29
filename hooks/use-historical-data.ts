@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { apiClient } from '@/lib/api-client'
 
 export interface HistoricalDataPoint {
   date: string
@@ -59,17 +60,7 @@ export function useHistoricalData(
           ? timeframeToDays(timeframe)
           : timeframe
 
-        const response = await fetch('/api/stocks/historical', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ symbol, days }),
-        })
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch historical data')
-        }
-
-        const historicalData = await response.json()
+        const historicalData = await apiClient.post<HistoricalData>('/stocks/historical', { symbol, days })
         setData(historicalData)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')

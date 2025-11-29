@@ -5,16 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Plus, TrendingUp, TrendingDown, DollarSign, Receipt, X } from 'lucide-react'
-import { Transaction, TransactionType, PaperTradingAccount } from '@/lib/types/portfolio'
+import { Transaction, TransactionType } from '@/lib/types/portfolio'
 import { useLocalStorage } from '@/hooks/use-local-storage'
 
 export function TransactionManager() {
   const [transactions, setTransactions] = useLocalStorage<Transaction[]>('quantpilot-transactions', [])
-  const [paperAccount, setPaperAccount] = useLocalStorage<PaperTradingAccount | null>('quantpilot-paper-account', null)
   const [showForm, setShowForm] = useState(false)
-
-  // Check if paper trading mode is active
-  const isPaperMode = paperAccount?.isActive || false
   const [formData, setFormData] = useState({
     symbol: '',
     type: 'buy' as TransactionType,
@@ -43,29 +39,7 @@ export function TransactionManager() {
       createdAt: new Date().toISOString()
     }
 
-    // Paper Trading Mode: Validate and update paper account
-    if (isPaperMode && paperAccount) {
-      if (formData.type === 'buy') {
-        const totalCost = (transaction.quantity * transaction.price) + transaction.fees
-        if (totalCost > paperAccount.currentCash) {
-          alert(`Insufficient funds! You have $${paperAccount.currentCash.toFixed(2)} but need $${totalCost.toFixed(2)}`)
-          return
-        }
-        // Deduct cash
-        paperAccount.currentCash -= totalCost
-      } else if (formData.type === 'sell') {
-        const proceeds = (transaction.quantity * transaction.price) - transaction.fees
-        // Add cash
-        paperAccount.currentCash += proceeds
-      }
-
-      // Add transaction to paper account
-      paperAccount.transactions = [transaction, ...paperAccount.transactions]
-      setPaperAccount({ ...paperAccount })
-    } else {
-      // Real Mode: Just save transaction
-      setTransactions([transaction, ...transactions])
-    }
+    setTransactions([transaction, ...transactions])
     setShowForm(false)
     setFormData({
       symbol: '',
@@ -113,13 +87,7 @@ export function TransactionManager() {
           </Button>
         </CardTitle>
         <CardDescription>
-          {isPaperMode ? (
-            <span className="text-blue-500 font-semibold">
-              Paper Trading Mode - Virtual Money Only
-            </span>
-          ) : (
-            'Track all your trades with dates, prices, and fees'
-          )}
+          Track all your trades with dates, prices, and fees
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -229,18 +197,12 @@ export function TransactionManager() {
 
         {/* Transaction List */}
         <div className="space-y-2 max-h-96 overflow-y-auto">
-          {/* Show paper account transactions if in paper mode, otherwise show real transactions */}
-          {(() => {
-            const displayTransactions = isPaperMode && paperAccount
-              ? paperAccount.transactions
-              : transactions
-
-            return displayTransactions.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                No transactions yet. Add your first trade to get started.
-              </p>
-            ) : (
-              displayTransactions.map((txn) => (
+          {transactions.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No transactions yet. Add your first trade to get started.
+            </p>
+          ) : (
+            transactions.map((txn) => (
               <div
                 key={txn.id}
                 className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50"
@@ -288,24 +250,16 @@ export function TransactionManager() {
                 </div>
               </div>
             ))
-            )
-          })()}
+          )}
         </div>
 
-        {(() => {
-          const displayTransactions = isPaperMode && paperAccount
-            ? paperAccount.transactions
-            : transactions
-
-          return displayTransactions.length > 0 && (
+        {transactions.length > 0 && (
           <div className="pt-4 border-t border-border">
             <p className="text-xs text-muted-foreground text-center">
-              {displayTransactions.length} total transaction{displayTransactions.length !== 1 ? 's' : ''}
-              {isPaperMode && ' (Virtual)'}
+              {transactions.length} total transaction{transactions.length !== 1 ? 's' : ''}
             </p>
           </div>
-          )
-        })()}
+        )}
       </CardContent>
     </Card>
   )

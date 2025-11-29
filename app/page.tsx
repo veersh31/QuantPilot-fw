@@ -19,14 +19,10 @@ import { useLocalStorage } from '@/hooks/use-local-storage'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { StockDataProvider } from '@/contexts/stock-data-context'
 import { DisclaimerBanner } from '@/components/legal/disclaimer-banner'
-import { DisclaimerFooter } from '@/components/legal/disclaimer-footer'
-import { PaperTrading } from '@/components/portfolio/paper-trading'
 import { TransactionManager } from '@/components/portfolio/transaction-manager'
 import { TaxReportComponent } from '@/components/portfolio/tax-report'
 import { WelcomeScreen } from '@/components/auth/welcome-screen'
-import { ModeSelection } from '@/components/auth/mode-selection'
 import { useAuth } from '@/contexts/auth-context'
-import { PaperTradingAccount } from '@/lib/types/portfolio'
 import { PredictionDashboard } from '@/components/ml/prediction-dashboard'
 import { Button } from '@/components/ui/button'
 import { MessageSquare, X } from 'lucide-react'
@@ -39,11 +35,9 @@ import { RebalancingCalculator } from '@/components/portfolio/rebalancing-calcul
 import { toast } from 'sonner'
 
 export default function Home() {
-  const { profile, isAuthenticated, hasCompletedOnboarding, setProfile, completeOnboarding, currentMode } = useAuth()
+  const { profile, isAuthenticated, hasCompletedOnboarding, setProfile, completeOnboarding } = useAuth()
   const [selectedStock, setSelectedStock] = useState<string | null>(null)
   const [portfolio, setPortfolio, portfolioLoaded] = useLocalStorage<any[]>('quantpilot-portfolio', [])
-  const [paperAccount, setPaperAccount] = useLocalStorage<PaperTradingAccount | null>('quantpilot-paper-account', null)
-  const [showModeSelection, setShowModeSelection] = useState(false)
   const [isChatOpen, setIsChatOpen] = useState(false)
 
   const handleUpdateQuantity = (symbol: string, newQuantity: number) => {
@@ -57,47 +51,12 @@ export default function Home() {
     toast.success(`${symbol} removed from portfolio`)
   }
 
-  const handleModeSelect = (mode: 'paper' | 'real', paperCash?: number) => {
-    if (mode === 'paper' && paperCash && !paperAccount) {
-      // Create paper account
-      const account: PaperTradingAccount = {
-        accountId: `paper-${Date.now()}`,
-        name: 'Paper Trading Account',
-        startingCash: paperCash,
-        currentCash: paperCash,
-        positions: [],
-        transactions: [],
-        summary: {
-          totalValue: paperCash,
-          totalCostBasis: 0,
-          totalUnrealizedGain: 0,
-          totalUnrealizedGainPercent: 0,
-          totalRealizedGain: 0,
-          totalDividends: 0,
-          totalFees: 0,
-          numberOfPositions: 0,
-          cash: paperCash,
-          timestamp: new Date().toISOString()
-        },
-        createdAt: new Date().toISOString(),
-        isActive: true
-      }
-      setPaperAccount(account)
-    }
-    completeOnboarding()
-  }
-
   // Show welcome screen if no profile
   if (!profile) {
     return <WelcomeScreen onComplete={(newProfile) => {
       setProfile(newProfile)
-      setShowModeSelection(true)
+      completeOnboarding()
     }} />
-  }
-
-  // Show mode selection if profile exists but onboarding not completed
-  if (profile && !hasCompletedOnboarding) {
-    return <ModeSelection profile={profile} onModeSelect={handleModeSelect} />
   }
 
   return (
@@ -261,22 +220,13 @@ export default function Home() {
                 )}
               </TabsContent>
 
-              {/* Account Tab - Transactions, Tax Reports (Paper Trading only in paper mode) */}
+              {/* Account Tab - Transactions, Tax Reports */}
               <TabsContent value="account" className="mt-4">
-                <Tabs defaultValue={currentMode === 'paper' ? 'paper-trading' : 'transactions'} className="w-full">
-                  <TabsList className={`grid w-full ${currentMode === 'paper' ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                    {currentMode === 'paper' && (
-                      <TabsTrigger value="paper-trading">Paper Trading</TabsTrigger>
-                    )}
+                <Tabs defaultValue="transactions" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="transactions">Transactions</TabsTrigger>
                     <TabsTrigger value="taxes">Tax Reports</TabsTrigger>
                   </TabsList>
-
-                  {currentMode === 'paper' && (
-                    <TabsContent value="paper-trading" className="mt-4">
-                      <PaperTrading />
-                    </TabsContent>
-                  )}
 
                   <TabsContent value="transactions" className="mt-4">
                     <TransactionManager />
@@ -351,9 +301,6 @@ export default function Home() {
           onClick={() => setIsChatOpen(false)}
         />
       )}
-
-      {/* Legal Disclaimer Footer - Temporarily removed */}
-      {/* <DisclaimerFooter /> */}
     </div>
     </StockDataProvider>
   )
