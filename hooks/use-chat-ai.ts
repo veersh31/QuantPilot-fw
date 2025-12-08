@@ -98,6 +98,63 @@ export function useChatWithAI() {
           }
         }
 
+        // Fetch news for all portfolio stocks + general market news
+        let portfolioNews: any = {}
+        let marketNews: any[] = []
+
+        try {
+          // Get unique symbols from portfolio
+          const portfolioSymbols = [...new Set(portfolio.map(stock => stock.symbol))]
+
+          // Fetch news for each portfolio stock (limit to top 5 by portfolio weight to avoid too many requests)
+          const topPortfolioStocks = portfolio
+            .sort((a, b) => (b.price * b.quantity) - (a.price * a.quantity))
+            .slice(0, 5)
+            .map(stock => stock.symbol)
+
+          const newsPromises = topPortfolioStocks.map(async (symbol) => {
+            try {
+              const newsResponse = await fetch('/api/stocks/news', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ symbol }),
+              })
+              if (newsResponse.ok) {
+                const data = await newsResponse.json()
+                return { symbol, news: data.news || [] }
+              }
+            } catch (err) {
+              console.log(`Failed to fetch news for ${symbol}`)
+            }
+            return { symbol, news: [] }
+          })
+
+          // Fetch general market news (SPY as proxy for market)
+          const marketNewsPromise = fetch('/api/stocks/news', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ symbol: 'SPY' }),
+          }).then(res => res.ok ? res.json() : { news: [] })
+            .then(data => data.news || [])
+            .catch(() => [])
+
+          const [portfolioNewsResults, marketNewsResult] = await Promise.all([
+            Promise.all(newsPromises),
+            marketNewsPromise
+          ])
+
+          // Build portfolioNews object
+          portfolioNewsResults.forEach(result => {
+            if (result.news.length > 0) {
+              portfolioNews[result.symbol] = result.news.slice(0, 3) // Top 3 for each stock
+            }
+          })
+
+          marketNews = marketNewsResult.slice(0, 5) // Top 5 market news
+        } catch (err) {
+          console.log('Failed to fetch portfolio/market news')
+        }
+
         const response = await fetch('/api/ai/chat', {
           method: 'POST',
           headers: {
@@ -112,6 +169,8 @@ export function useChatWithAI() {
               content: msg.content
             })),
             mlPredictions,
+            portfolioNews,
+            marketNews,
             timestamp: new Date().toISOString(),
           }),
         })

@@ -20,10 +20,8 @@ import { ErrorBoundary } from '@/components/error-boundary'
 import { StockDataProvider } from '@/contexts/stock-data-context'
 import { DisclaimerBanner } from '@/components/legal/disclaimer-banner'
 import { DisclaimerFooter } from '@/components/legal/disclaimer-footer'
-import { PaperTrading } from '@/components/portfolio/paper-trading'
-import { TransactionManager } from '@/components/portfolio/transaction-manager'
-import { TaxReportComponent } from '@/components/portfolio/tax-report'
 import { WelcomeScreen } from '@/components/auth/welcome-screen'
+import { MarketNews } from '@/components/news/market-news'
 import { ModeSelection } from '@/components/auth/mode-selection'
 import { useAuth } from '@/contexts/auth-context'
 import { PaperTradingAccount } from '@/lib/types/portfolio'
@@ -39,7 +37,7 @@ import { RebalancingCalculator } from '@/components/portfolio/rebalancing-calcul
 import { toast } from 'sonner'
 
 export default function Home() {
-  const { profile, isAuthenticated, hasCompletedOnboarding, setProfile, completeOnboarding, currentMode } = useAuth()
+  const { profile, isAuthenticated, hasCompletedOnboarding, setProfile, completeOnboarding } = useAuth()
   const [selectedStock, setSelectedStock] = useState<string | null>(null)
   const [portfolio, setPortfolio, portfolioLoaded] = useLocalStorage<any[]>('quantpilot-portfolio', [])
   const [paperAccount, setPaperAccount] = useLocalStorage<PaperTradingAccount | null>('quantpilot-paper-account', null)
@@ -121,7 +119,7 @@ export default function Home() {
                 <TabsTrigger value="portfolio" className="text-xs md:text-sm">Portfolio</TabsTrigger>
                 <TabsTrigger value="analysis" className="text-xs md:text-sm">Analysis</TabsTrigger>
                 <TabsTrigger value="ml-predictions" className="text-xs md:text-sm">ML Predictions</TabsTrigger>
-                <TabsTrigger value="account" className="text-xs md:text-sm">Account</TabsTrigger>
+                <TabsTrigger value="news" className="text-xs md:text-sm">News</TabsTrigger>
               </TabsList>
 
               {/* Overview Tab - Search Stocks */}
@@ -261,31 +259,9 @@ export default function Home() {
                 )}
               </TabsContent>
 
-              {/* Account Tab - Transactions, Tax Reports (Paper Trading only in paper mode) */}
-              <TabsContent value="account" className="mt-4">
-                <Tabs defaultValue={currentMode === 'paper' ? 'paper-trading' : 'transactions'} className="w-full">
-                  <TabsList className={`grid w-full ${currentMode === 'paper' ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                    {currentMode === 'paper' && (
-                      <TabsTrigger value="paper-trading">Paper Trading</TabsTrigger>
-                    )}
-                    <TabsTrigger value="transactions">Transactions</TabsTrigger>
-                    <TabsTrigger value="taxes">Tax Reports</TabsTrigger>
-                  </TabsList>
-
-                  {currentMode === 'paper' && (
-                    <TabsContent value="paper-trading" className="mt-4">
-                      <PaperTrading />
-                    </TabsContent>
-                  )}
-
-                  <TabsContent value="transactions" className="mt-4">
-                    <TransactionManager />
-                  </TabsContent>
-
-                  <TabsContent value="taxes" className="mt-4">
-                    <TaxReportComponent />
-                  </TabsContent>
-                </Tabs>
+              {/* News Tab - Market News & Stock-Specific News powered by Finnhub */}
+              <TabsContent value="news" className="mt-4">
+                <MarketNews selectedStock={selectedStock} />
               </TabsContent>
             </Tabs>
           </div>

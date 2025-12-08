@@ -27,15 +27,26 @@ export function PredictionDashboard({ symbol }: PredictionDashboardProps) {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        console.error('[ML Dashboard] Error details:', errorData)
-        throw new Error(errorData.details || errorData.error || 'Failed to fetch predictions')
+        let errorMessage = 'Failed to fetch predictions'
+        try {
+          const errorData = await response.json()
+          console.error('[ML Dashboard] Error response:', errorData)
+          // Check for different error field names: detail (FastAPI), details, error, message
+          errorMessage = errorData.detail || errorData.details || errorData.error || errorData.message || errorMessage
+        } catch (parseError) {
+          // If JSON parsing fails, use status text
+          console.error('[ML Dashboard] Failed to parse error response:', parseError)
+          errorMessage = `Server error (${response.status}): ${response.statusText}`
+        }
+        throw new Error(errorMessage)
       }
 
       const data = await response.json()
       setPredictions(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error occurred'
+      console.error('[ML Dashboard] Error:', errorMsg)
+      setError(errorMsg)
     } finally {
       setLoading(false)
     }
@@ -115,70 +126,78 @@ export function PredictionDashboard({ symbol }: PredictionDashboardProps) {
   return (
     <div className="space-y-6">
       {/* Header Card */}
-      <Card className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-blue-500/20">
-        <CardHeader>
+      <Card className="bg-gradient-to-br from-blue-600/15 via-purple-600/10 to-indigo-600/15 border-blue-500/30 shadow-lg">
+        <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Brain className="text-blue-500" size={24} />
-                ML Price Predictions for {symbol}
+            <div className="space-y-1">
+              <CardTitle className="flex items-center gap-3 text-2xl">
+                <div className="p-2 rounded-lg bg-blue-500/20">
+                  <Brain className="text-blue-600 dark:text-blue-400" size={28} />
+                </div>
+                <span>ML Price Predictions</span>
               </CardTitle>
-              <CardDescription className="mt-2">
-                Ensemble of {Object.keys(preds.modelPerformances).length} trained ML models • {dataPoints} data points
+              <CardDescription className="text-base flex items-center gap-2">
+                <span className="font-semibold text-blue-600 dark:text-blue-400">{symbol}</span>
+                <span className="text-muted-foreground/60">•</span>
+                <span>{Object.keys(preds.modelPerformances).length} ML models</span>
+                <span className="text-muted-foreground/60">•</span>
+                <span>{dataPoints} data points</span>
               </CardDescription>
             </div>
-            <Button onClick={fetchPredictions} variant="outline" size="sm">
+            <Button onClick={fetchPredictions} variant="outline" size="sm" className="shadow-sm">
               Refresh
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4 border-t border-border/50">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Current Price</p>
-              <p className="text-3xl font-bold">${currentPrice.toFixed(2)}</p>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Current Market Price</p>
+              <p className="text-4xl font-bold tracking-tight">${currentPrice.toFixed(2)}</p>
             </div>
-            <div className={`px-4 py-2 rounded-lg ${getRecommendationColor(preds.recommendation)}`}>
-              <p className="text-xs font-semibold opacity-70">ML RECOMMENDATION</p>
-              <p className="text-lg font-bold">{preds.recommendation.replace('_', ' ')}</p>
+            <div className={`px-6 py-3 rounded-xl shadow-md ${getRecommendationColor(preds.recommendation)}`}>
+              <p className="text-xs font-bold opacity-70 tracking-wider mb-1">AI RECOMMENDATION</p>
+              <p className="text-xl font-bold tracking-tight">{preds.recommendation.replace('_', ' ')}</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Price Predictions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Next Day */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Target size={16} className="text-blue-500" />
-              Next Day
+        <Card className="border-blue-200/50 dark:border-blue-800/50 shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2 font-semibold">
+              <div className="p-1.5 rounded-md bg-blue-500/15">
+                <Target size={18} className="text-blue-600 dark:text-blue-400" />
+              </div>
+              <span>Next Day Forecast</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              <div>
-                <p className="text-2xl font-bold flex items-center gap-2">
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <p className="text-3xl font-bold flex items-center gap-2">
                   ${nextDay.predictedPrice.toFixed(2)}
                   {nextDayReturn > 0 ? (
-                    <TrendingUp className="text-chart-1" size={20} />
+                    <TrendingUp className="text-green-600 dark:text-green-400" size={24} />
                   ) : (
-                    <TrendingDown className="text-destructive" size={20} />
+                    <TrendingDown className="text-red-600 dark:text-red-400" size={24} />
                   )}
                 </p>
-                <p className={`text-sm font-semibold ${nextDayReturn >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
+                <div className={`inline-flex items-center px-2 py-1 rounded-md text-sm font-bold ${nextDayReturn >= 0 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
                   {nextDayReturn >= 0 ? '+' : ''}{nextDayReturn.toFixed(2)}%
-                </p>
-              </div>
-              <div className="text-xs space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Confidence:</span>
-                  <span className="font-semibold">{(nextDay.confidence * 100).toFixed(0)}%</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Range:</span>
-                  <span className="font-semibold">
+              </div>
+              <div className="space-y-2 pt-3 border-t border-border/50">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Confidence</span>
+                  <span className="text-sm font-bold">{(nextDay.confidence * 100).toFixed(0)}%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Range</span>
+                  <span className="text-xs font-semibold">
                     ${nextDay.lowerBound.toFixed(2)} - ${nextDay.upperBound.toFixed(2)}
                   </span>
                 </div>
@@ -188,36 +207,38 @@ export function PredictionDashboard({ symbol }: PredictionDashboardProps) {
         </Card>
 
         {/* Next Week */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Activity size={16} className="text-purple-500" />
-              Next Week (5 days)
+        <Card className="border-purple-200/50 dark:border-purple-800/50 shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2 font-semibold">
+              <div className="p-1.5 rounded-md bg-purple-500/15">
+                <Activity size={18} className="text-purple-600 dark:text-purple-400" />
+              </div>
+              <span>Next Week (5 days)</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              <div>
-                <p className="text-2xl font-bold flex items-center gap-2">
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <p className="text-3xl font-bold flex items-center gap-2">
                   ${nextWeek.predictedPrice.toFixed(2)}
                   {nextWeekReturn > 0 ? (
-                    <TrendingUp className="text-chart-1" size={20} />
+                    <TrendingUp className="text-green-600 dark:text-green-400" size={24} />
                   ) : (
-                    <TrendingDown className="text-destructive" size={20} />
+                    <TrendingDown className="text-red-600 dark:text-red-400" size={24} />
                   )}
                 </p>
-                <p className={`text-sm font-semibold ${nextWeekReturn >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
+                <div className={`inline-flex items-center px-2 py-1 rounded-md text-sm font-bold ${nextWeekReturn >= 0 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
                   {nextWeekReturn >= 0 ? '+' : ''}{nextWeekReturn.toFixed(2)}%
-                </p>
-              </div>
-              <div className="text-xs space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Confidence:</span>
-                  <span className="font-semibold">{(nextWeek.confidence * 100).toFixed(0)}%</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Range:</span>
-                  <span className="font-semibold">
+              </div>
+              <div className="space-y-2 pt-3 border-t border-border/50">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Confidence</span>
+                  <span className="text-sm font-bold">{(nextWeek.confidence * 100).toFixed(0)}%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Range</span>
+                  <span className="text-xs font-semibold">
                     ${nextWeek.lowerBound.toFixed(2)} - ${nextWeek.upperBound.toFixed(2)}
                   </span>
                 </div>
@@ -227,36 +248,38 @@ export function PredictionDashboard({ symbol }: PredictionDashboardProps) {
         </Card>
 
         {/* Next Month */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <BarChart3 size={16} className="text-orange-500" />
-              Next Month (20 days)
+        <Card className="border-orange-200/50 dark:border-orange-800/50 shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2 font-semibold">
+              <div className="p-1.5 rounded-md bg-orange-500/15">
+                <BarChart3 size={18} className="text-orange-600 dark:text-orange-400" />
+              </div>
+              <span>Next Month (20 days)</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              <div>
-                <p className="text-2xl font-bold flex items-center gap-2">
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <p className="text-3xl font-bold flex items-center gap-2">
                   ${nextMonth.predictedPrice.toFixed(2)}
                   {nextMonthReturn > 0 ? (
-                    <TrendingUp className="text-chart-1" size={20} />
+                    <TrendingUp className="text-green-600 dark:text-green-400" size={24} />
                   ) : (
-                    <TrendingDown className="text-destructive" size={20} />
+                    <TrendingDown className="text-red-600 dark:text-red-400" size={24} />
                   )}
                 </p>
-                <p className={`text-sm font-semibold ${nextMonthReturn >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
+                <div className={`inline-flex items-center px-2 py-1 rounded-md text-sm font-bold ${nextMonthReturn >= 0 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
                   {nextMonthReturn >= 0 ? '+' : ''}{nextMonthReturn.toFixed(2)}%
-                </p>
-              </div>
-              <div className="text-xs space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Confidence:</span>
-                  <span className="font-semibold">{(nextMonth.confidence * 100).toFixed(0)}%</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Range:</span>
-                  <span className="font-semibold">
+              </div>
+              <div className="space-y-2 pt-3 border-t border-border/50">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Confidence</span>
+                  <span className="text-sm font-bold">{(nextMonth.confidence * 100).toFixed(0)}%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Range</span>
+                  <span className="text-xs font-semibold">
                     ${nextMonth.lowerBound.toFixed(2)} - ${nextMonth.upperBound.toFixed(2)}
                   </span>
                 </div>
@@ -267,19 +290,25 @@ export function PredictionDashboard({ symbol }: PredictionDashboardProps) {
       </div>
 
       {/* Model Analysis */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">ML Analysis</CardTitle>
+      <Card className="shadow-md border-border/50">
+        <CardHeader className="border-b border-border/50">
+          <CardTitle className="text-lg font-semibold">AI Analysis & Insights</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="p-4 rounded-lg bg-blue-500/5 border border-blue-500/20">
-              <p className="text-sm whitespace-pre-line font-mono">{preds.analysis}</p>
+        <CardContent className="pt-6">
+          <div className="space-y-5">
+            <div className="p-5 rounded-xl bg-gradient-to-br from-blue-500/10 to-indigo-500/5 border border-blue-500/20">
+              <p className="text-sm whitespace-pre-line leading-relaxed font-mono">{preds.analysis}</p>
             </div>
 
-            <div className="text-xs text-muted-foreground">
-              <p className="font-semibold mb-2">Overall Confidence: {(preds.confidence * 100).toFixed(1)}%</p>
-              <p>Models used: Linear Regression, Random Forest, Exponential Smoothing, ARIMA</p>
+            <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50 border border-border/50">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Overall Model Confidence</p>
+                <p className="text-2xl font-bold">{(preds.confidence * 100).toFixed(1)}%</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Ensemble Models</p>
+                <p className="text-sm font-semibold">Ridge • Lasso • RF • GBM • ARIMA • ES</p>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -349,45 +378,47 @@ export function PredictionDashboard({ symbol }: PredictionDashboardProps) {
       </Card>
 
       {/* Backtest Results */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Backtesting Results</CardTitle>
-          <CardDescription>Historical performance of ML trading strategy</CardDescription>
+      <Card className="shadow-md border-border/50">
+        <CardHeader className="border-b border-border/50">
+          <CardTitle className="text-lg font-semibold">Backtesting Performance</CardTitle>
+          <CardDescription className="text-sm">Historical simulation of ML trading strategy on actual market data</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div className="p-3 rounded-lg border border-border">
-              <p className="text-xs text-muted-foreground">Total Returns</p>
-              <p className={`text-xl font-bold ${backtest.totalReturns >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
+            <div className="p-4 rounded-xl border-2 border-border/50 bg-gradient-to-br from-green-500/5 to-emerald-500/5">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Total Returns</p>
+              <p className={`text-2xl font-bold ${backtest.totalReturns >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                 {backtest.totalReturns >= 0 ? '+' : ''}{backtest.totalReturns.toFixed(2)}%
               </p>
             </div>
-            <div className="p-3 rounded-lg border border-border">
-              <p className="text-xs text-muted-foreground">Annualized</p>
-              <p className={`text-xl font-bold ${backtest.annualizedReturns >= 0 ? 'text-chart-1' : 'text-destructive'}`}>
+            <div className="p-4 rounded-xl border-2 border-border/50 bg-gradient-to-br from-blue-500/5 to-cyan-500/5">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Annualized</p>
+              <p className={`text-2xl font-bold ${backtest.annualizedReturns >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                 {backtest.annualizedReturns >= 0 ? '+' : ''}{backtest.annualizedReturns.toFixed(2)}%
               </p>
             </div>
-            <div className="p-3 rounded-lg border border-border">
-              <p className="text-xs text-muted-foreground">Sharpe Ratio</p>
-              <p className="text-xl font-bold">{backtest.sharpeRatio.toFixed(2)}</p>
+            <div className="p-4 rounded-xl border-2 border-border/50 bg-gradient-to-br from-purple-500/5 to-violet-500/5">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Sharpe Ratio</p>
+              <p className="text-2xl font-bold">{backtest.sharpeRatio.toFixed(2)}</p>
             </div>
-            <div className="p-3 rounded-lg border border-border">
-              <p className="text-xs text-muted-foreground">Max Drawdown</p>
-              <p className="text-xl font-bold text-destructive">-{backtest.maxDrawdown.toFixed(2)}%</p>
+            <div className="p-4 rounded-xl border-2 border-border/50 bg-gradient-to-br from-red-500/5 to-rose-500/5">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Max Drawdown</p>
+              <p className="text-2xl font-bold text-red-600 dark:text-red-400">-{backtest.maxDrawdown.toFixed(2)}%</p>
             </div>
-            <div className="p-3 rounded-lg border border-border">
-              <p className="text-xs text-muted-foreground">Win Rate</p>
-              <p className="text-xl font-bold">{backtest.winRate.toFixed(1)}%</p>
+            <div className="p-4 rounded-xl border-2 border-border/50 bg-gradient-to-br from-orange-500/5 to-amber-500/5">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Win Rate</p>
+              <p className="text-2xl font-bold">{backtest.winRate.toFixed(1)}%</p>
             </div>
-            <div className="p-3 rounded-lg border border-border">
-              <p className="text-xs text-muted-foreground">Profit Factor</p>
-              <p className="text-xl font-bold">{backtest.profitFactor.toFixed(2)}</p>
+            <div className="p-4 rounded-xl border-2 border-border/50 bg-gradient-to-br from-teal-500/5 to-cyan-500/5">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Profit Factor</p>
+              <p className="text-2xl font-bold">{backtest.profitFactor.toFixed(2)}</p>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground mt-4">
-            Based on {backtest.trades.length} trades • Initial capital: $10,000
-          </p>
+          <div className="mt-5 p-3 rounded-lg bg-muted/50 border border-border/50">
+            <p className="text-xs text-muted-foreground text-center">
+              <span className="font-semibold">{backtest.trades.length} trades</span> executed • Initial capital: <span className="font-semibold">$10,000</span>
+            </p>
+          </div>
         </CardContent>
       </Card>
 

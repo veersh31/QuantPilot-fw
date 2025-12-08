@@ -1,6 +1,6 @@
 """
-FastAPI Service for ML Stock/ETF Price Predictions
-Professional-grade ML predictions with proper libraries
+FastAPI Service for ML Stock/ETF Price Predictions & Stock Data
+Professional-grade ML predictions with comprehensive stock data endpoints
 """
 
 from fastapi import FastAPI, HTTPException
@@ -11,12 +11,20 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
+import time
 
 from feature_engineering import engineer_dataset, normalize_features, extract_features
 from models import MLEnsemble, TimeSeriesModels, evaluate_model
 from backtesting import Backtester
+from stock_data import StockDataFetcher
+from technical_indicators import TechnicalIndicators
+from cache import cache
 
-app = FastAPI(title="QuantPilot ML Service", version="1.0.0")
+app = FastAPI(
+    title="QuantPilot ML & Stock Data Service",
+    version="2.0.0",
+    description="Unified Python backend for stock data, technical indicators, and ML predictions"
+)
 
 # Enable CORS
 app.add_middleware(
@@ -26,6 +34,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Initialize services
+stock_fetcher = StockDataFetcher(cache_ttl=300)
 
 
 class PredictionRequest(BaseModel):
@@ -46,18 +57,265 @@ class PredictionResponse(BaseModel):
     last_update: str
 
 
+class HistoricalRequest(BaseModel):
+    symbol: str
+    days: Optional[int] = 730
+
+
+class QuoteRequest(BaseModel):
+    symbol: str
+
+
+class FundamentalsRequest(BaseModel):
+    symbol: str
+
+
+class IndicatorsRequest(BaseModel):
+    symbol: str
+    days: Optional[int] = 200
+
+
+class FeaturesRequest(BaseModel):
+    symbol: str
+    days: Optional[int] = 730
+
+
 @app.get("/")
 async def root():
     return {
-        "service": "QuantPilot ML Prediction Service",
-        "version": "1.0.0",
-        "status": "running"
+        "service": "QuantPilot ML & Stock Data Service",
+        "version": "2.0.0",
+        "status": "running",
+        "endpoints": {
+            "stock_data": ["/quote", "/historical", "/fundamentals"],
+            "technical_analysis": ["/indicators"],
+            "ml_features": ["/features"],
+            "ml_predictions": ["/predict"]
+        }
     }
 
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    cache.cleanup_expired()
+    return {
+        "status": "healthy",
+        "cache_stats": cache.stats()
+    }
+
+
+@app.post("/historical")
+async def get_historical_data(request: HistoricalRequest):
+    """
+    Fetch historical OHLCV data for a symbol
+
+    Returns cached data if available, otherwise fetches from Yahoo Finance
+    """
+    symbol = request.symbol.upper()
+    cache_key = f"historical:{symbol}:{request.days}"
+
+    try:
+        # Check cache first
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return cached_data
+
+        # Fetch fresh data
+        df = stock_fetcher.fetch_historical_data(symbol, days=request.days)
+
+        response = {
+            "symbol": symbol,
+            "data": df.to_dict('records'),
+            "dataPoints": len(df),
+            "timestamp": datetime.now().isoformat()
+        }
+
+        # Cache for 5 minutes
+        cache.set(cache_key, response, ttl=300)
+
+        return response
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch historical data: {str(e)}")
+
+
+@app.post("/quote")
+async def get_quote(request: QuoteRequest):
+    """
+    Fetch current quote data for a symbol
+
+    Returns real-time price, change, volume, and key metrics
+    """
+    symbol = request.symbol.upper()
+    cache_key = f"quote:{symbol}"
+
+    try:
+        # Check cache (1 minute TTL for quotes)
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return cached_data
+
+        # Fetch fresh quote
+        quote_data = stock_fetcher.fetch_quote(symbol)
+
+        # Cache for 1 minute
+        cache.set(cache_key, quote_data, ttl=60)
+
+        return quote_data
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch quote: {str(e)}")
+
+
+@app.post("/fundamentals")
+async def get_fundamentals(request: FundamentalsRequest):
+    """
+    Fetch fundamental data for a stock or ETF
+
+    Returns different metrics based on whether symbol is stock or ETF
+    """
+    symbol = request.symbol.upper()
+    cache_key = f"fundamentals:{symbol}"
+
+    try:
+        # Check cache (1 hour TTL for fundamentals)
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return cached_data
+
+        # Fetch fresh fundamentals
+        fundamentals_data = stock_fetcher.fetch_fundamentals(symbol)
+
+        # Cache for 1 hour
+        cache.set(cache_key, fundamentals_data, ttl=3600)
+
+        return fundamentals_data
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch fundamentals: {str(e)}")
+
+
+@app.post("/indicators")
+async def calculate_indicators(request: IndicatorsRequest):
+    """
+    Calculate all technical indicators for a symbol
+
+    Returns comprehensive technical analysis including RSI, MACD, Bollinger Bands,
+    Moving Averages, Stochastic, VWAP, ADX, Williams %R, CCI, and overall signal
+    """
+    symbol = request.symbol.upper()
+    cache_key = f"indicators:{symbol}:{request.days}"
+
+    try:
+        # Check cache (5 minute TTL)
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return cached_data
+
+        print(f"\n[Indicators] Calculating for {symbol} ({request.days} days)")
+
+        # Fetch historical data
+        df = stock_fetcher.fetch_historical_data(symbol, days=request.days)
+
+        # Calculate all technical indicators
+        analysis = TechnicalIndicators.calculate_all(df)
+
+        response = {
+            "symbol": symbol,
+            "analysis": analysis,
+            "dataPoints": len(df),
+            "currentPrice": float(df['close'].iloc[-1])
+        }
+
+        # Cache for 5 minutes
+        cache.set(cache_key, response, ttl=300)
+
+        print(f"[Indicators] Complete for {symbol} - Overall: {analysis['overallSignal']}")
+
+        return response
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to calculate indicators: {str(e)}")
+
+
+@app.post("/features")
+async def get_engineered_features(request: FeaturesRequest):
+    """
+    Get all 40+ engineered ML features for a symbol
+
+    Useful for custom analysis and understanding feature importance
+    """
+    symbol = request.symbol.upper()
+    cache_key = f"features:{symbol}:{request.days}"
+
+    try:
+        # Check cache (5 minute TTL)
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return cached_data
+
+        print(f"\n[Features] Extracting for {symbol}")
+
+        # Fetch historical data
+        df = stock_fetcher.fetch_historical_data(symbol, days=request.days)
+
+        # Fetch SPY data for market-relative features (unless symbol IS SPY)
+        spy_df = None
+        if symbol != 'SPY':
+            try:
+                spy_df = stock_fetcher.fetch_historical_data('SPY', days=request.days)
+                print(f"   ✓ Fetched SPY data for beta calculation")
+            except:
+                print(f"   ⚠ Could not fetch SPY data")
+
+        # Extract current features
+        current_features = extract_features(df, -1, spy_df=spy_df)
+
+        # Also get historical features for last 30 days
+        historical_features = []
+        lookback = min(30, len(df) - 200)  # Last 30 days or available
+        for i in range(lookback):
+            idx = -(i + 1)
+            try:
+                feat = extract_features(df, idx, spy_df=spy_df)
+                feat['date'] = df.iloc[idx]['date']
+                historical_features.append(feat)
+            except:
+                continue
+
+        historical_features.reverse()  # Oldest to newest
+
+        response = {
+            "symbol": symbol,
+            "current_features": current_features,
+            "historical_features": historical_features,
+            "feature_count": len(current_features),
+            "timestamp": datetime.now().isoformat()
+        }
+
+        # Cache for 5 minutes
+        cache.set(cache_key, response, ttl=300)
+
+        print(f"[Features] Extracted {len(current_features)} features for {symbol}")
+
+        return response
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to extract features: {str(e)}")
 
 
 @app.post("/predict", response_model=PredictionResponse)
@@ -80,25 +338,15 @@ async def predict(request: PredictionRequest):
         print(f"[ML Service] Processing prediction request for {symbol}")
         print(f"{'='*60}\n")
 
-        # Fetch historical data
+        # Fetch historical data using unified fetcher
         print("[1/6] Fetching historical data...")
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=730)  # 2 years
+        df = stock_fetcher.fetch_historical_data(symbol, days=730)
 
-        ticker = yf.Ticker(symbol)
-        df = ticker.history(start=start_date, end=end_date)
-
-        if df.empty or len(df) < 250:
+        if len(df) < 250:
             raise HTTPException(
                 status_code=400,
                 detail=f"Insufficient data for {symbol}. Need at least 250 days, got {len(df)}"
             )
-
-        # Prepare data
-        df = df.reset_index()
-        df.columns = [col.lower() for col in df.columns]
-        df = df.rename(columns={'date': 'date'})
-        df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
 
         print(f"   ✓ Fetched {len(df)} data points for {symbol}")
 
@@ -106,14 +354,8 @@ async def predict(request: PredictionRequest):
         spy_df = None
         if symbol != 'SPY':
             try:
-                spy_ticker = yf.Ticker('SPY')
-                spy_df = spy_ticker.history(start=start_date, end=end_date)
-                if not spy_df.empty:
-                    spy_df = spy_df.reset_index()
-                    spy_df.columns = [col.lower() for col in spy_df.columns]
-                    print(f"   ✓ Fetched {len(spy_df)} SPY data points for beta calculation")
-                else:
-                    print("   ⚠ SPY data unavailable, skipping market-relative features")
+                spy_df = stock_fetcher.fetch_historical_data('SPY', days=730)
+                print(f"   ✓ Fetched {len(spy_df)} SPY data points for beta calculation")
             except Exception as e:
                 print(f"   ⚠ Could not fetch SPY data: {e}")
                 spy_df = None
@@ -172,7 +414,21 @@ async def predict(request: PredictionRequest):
         current_features_normalized = current_features_normalized.fillna(0)
 
         # Generate predictions
-        current_price = float(df.iloc[-1]['close'])
+        # Get real-time current price using fast_info (most reliable real-time price)
+        try:
+            ticker = yf.Ticker(symbol)
+            # Use fast_info for quick real-time price access
+            current_price = float(ticker.fast_info.get('lastPrice', df.iloc[-1]['close']))
+            print(f"   ✓ Real-time price: ${current_price:.2f} (from fast_info)")
+        except Exception as e:
+            # Fallback to info if fast_info fails
+            try:
+                info = ticker.info
+                current_price = float(info.get('currentPrice') or info.get('regularMarketPrice') or df.iloc[-1]['close'])
+                print(f"   ✓ Real-time price: ${current_price:.2f} (from info)")
+            except Exception as e2:
+                print(f"   ⚠ Could not fetch real-time price, using last close: {e2}")
+                current_price = float(df.iloc[-1]['close'])
 
         # Next day prediction (ML models predict RETURN, convert to price)
         next_day_return = float(ml_ensemble.predict(current_features_normalized)[0])

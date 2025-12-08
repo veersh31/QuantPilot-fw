@@ -1,9 +1,7 @@
-import YahooFinance from 'yahoo-finance2'
+import { getQuote } from '@/lib/python-service'
 import { stockQuoteRequestSchema } from '@/lib/validations'
 import { ZodError } from 'zod'
 import { logger } from '@/lib/logger'
-
-const yahooFinance = new YahooFinance()
 
 export async function POST(request: Request) {
   try {
@@ -14,41 +12,10 @@ export async function POST(request: Request) {
 
     logger.apiRequest('POST', '/api/stocks/quote', { symbol })
 
-    // Fetch quote data from Yahoo Finance using quoteSummary
-    const result = await yahooFinance.quoteSummary(symbol, {
-      modules: ['price', 'summaryDetail', 'defaultKeyStatistics']
-    }, { validateResult: false })
+    console.log('[Stock Quote] Fetching from Python service:', symbol)
 
-    if (!result || !result.price) {
-      return Response.json({ error: 'Symbol not found' }, { status: 404 })
-    }
-
-    const { price: priceModule, summaryDetail } = result
-
-    const price = priceModule.regularMarketPrice || 0
-    const change = priceModule.regularMarketChange || 0
-    const changePercent = priceModule.regularMarketChangePercent || 0
-
-    // Detect if this is an ETF or stock
-    const quoteType = priceModule.quoteType || 'EQUITY'
-    const isETF = quoteType === 'ETF'
-
-    const stockData = {
-      symbol: symbol.toUpperCase(),
-      price: price,
-      change: parseFloat(change.toFixed(2)),
-      changePercent: changePercent.toFixed(2),
-      high52w: summaryDetail?.fiftyTwoWeekHigh || price,
-      low52w: summaryDetail?.fiftyTwoWeekLow || price,
-      marketCap: priceModule.marketCap?.toString() || 'N/A',
-      pe: summaryDetail?.trailingPE || 0,
-      dividendYield: summaryDetail?.dividendYield ? (summaryDetail.dividendYield * 100) : 0,
-      volume: priceModule.regularMarketVolume || 0,
-      avgVolume: priceModule.averageDailyVolume3Month || 0,
-      timestamp: new Date().toISOString(),
-      quoteType: quoteType,
-      isETF: isETF,
-    }
+    // Proxy to Python service
+    const stockData = await getQuote(symbol)
 
     logger.stockFetch(symbol, true)
 

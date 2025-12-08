@@ -135,7 +135,7 @@ function extractStockSymbols(message: string): string[] {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { message, portfolio, selectedStock, conversationHistory = [], mlPredictions = null } = body
+    const { message, portfolio, selectedStock, conversationHistory = [], mlPredictions = null, portfolioNews = {}, marketNews = [] } = body
 
     // Detect if user is asking about a specific stock in their message
     const mentionedSymbols = extractStockSymbols(message)
@@ -224,11 +224,13 @@ OVERALL SIGNAL: ${technicalData.overallSignal.toUpperCase().replace('_', ' ')}`
       technicalContext = 'User has not specified a particular stock. Feel free to answer general questions or ask them to specify a stock symbol for detailed analysis.'
     }
 
-    // Build News context
+    // Build News context - includes target stock, portfolio stocks, and market news
     let newsContext = ''
+
+    // Target stock news (from API call above)
     if (newsData.length > 0 && targetStock) {
       const topNews = newsData.slice(0, 5) // Get top 5 news items
-      newsContext = `
+      newsContext += `
 📰 LATEST NEWS FOR ${targetStock}:
 ${topNews.map((item, idx) => {
         const timeAgo = getTimeAgo(item.publishedAt)
@@ -238,11 +240,38 @@ ${idx + 1}. ${item.title}
    Source: ${item.source} | ${timeAgo}
    Sentiment: ${item.sentiment || 'neutral'}`
       }).join('\n')}
-
-When discussing news, reference these actual headlines and their sentiment.
 `
     } else if (targetStock) {
-      newsContext = `No recent news available for ${targetStock}.`
+      newsContext += `No recent news available for ${targetStock}.\n`
+    }
+
+    // Portfolio stocks news
+    const portfolioSymbols = Object.keys(portfolioNews)
+    if (portfolioSymbols.length > 0) {
+      newsContext += `\n📊 PORTFOLIO STOCKS NEWS:\n`
+      portfolioSymbols.forEach(symbol => {
+        const stockNews = portfolioNews[symbol]
+        if (stockNews && stockNews.length > 0) {
+          newsContext += `\n${symbol}:\n`
+          stockNews.slice(0, 2).forEach((item: any, idx: number) => {
+            const timeAgo = getTimeAgo(item.publishedAt)
+            newsContext += `  ${idx + 1}. ${item.title}\n     ${item.summary}\n     ${timeAgo} | ${item.sentiment || 'neutral'}\n`
+          })
+        }
+      })
+    }
+
+    // Market news
+    if (marketNews.length > 0) {
+      newsContext += `\n📈 GENERAL MARKET NEWS (SPY/S&P 500):\n`
+      marketNews.slice(0, 3).forEach((item: any, idx: number) => {
+        const timeAgo = getTimeAgo(item.publishedAt)
+        newsContext += `${idx + 1}. ${item.title}\n   ${item.summary}\n   ${timeAgo} | ${item.sentiment || 'neutral'}\n`
+      })
+    }
+
+    if (newsContext) {
+      newsContext += `\nWhen discussing news, reference these actual headlines and their sentiment.`
     }
 
     // Build ML Predictions context
@@ -316,10 +345,15 @@ When responding:
 2. Use clear, direct language - no excessive markdown or formatting
 3. PRIORITIZE ML predictions when available - cite EXACT predicted prices and returns
 4. Combine ML predictions with technical indicators for comprehensive analysis
-5. When news is available, reference specific headlines and their sentiment
-6. Give one primary recommendation based on data-driven analysis
-7. Mention 1-2 risks or considerations
-8. End with a clear actionable suggestion
+5. **IMPORTANT**: You have access to news for:
+   - The target stock being discussed
+   - ALL stocks in the user's portfolio
+   - General market news (S&P 500/SPY)
+   When news is available, reference specific headlines, their sentiment, and how they impact portfolio holdings
+6. If user asks about portfolio or market sentiment, analyze news across all holdings and market trends
+7. Give one primary recommendation based on data-driven analysis
+8. Mention 1-2 risks or considerations
+9. End with a clear actionable suggestion
 
 IMPORTANT: You can answer questions about ANY stock, not just the one currently selected. If the user asks about a specific stock symbol (e.g., AAPL, MSFT, TSLA), provide analysis for that stock even if a different stock is selected in the UI.
 
@@ -335,10 +369,12 @@ ${technicalContext}
 
 Remember:
 - When ML predictions are available, ALWAYS cite the exact predicted prices and percentage returns
-- When news is available, reference specific headlines and their sentiment to provide context
-- Combine news sentiment, ML forecasts, and technical analysis for comprehensive recommendations
+- You have access to news for PORTFOLIO stocks and MARKET trends - use this to identify broader impacts
+- If user asks "what's happening with my portfolio?" or "how's the market?", analyze all portfolio stock news and market news
+- Combine news sentiment across holdings, ML forecasts, and technical analysis for comprehensive recommendations
 - Base your analysis on REAL data provided above, not generic advice
 - The ML model uses 29+ quantitative features and has been backtested
+- When discussing portfolio risk, consider news sentiment across all holdings
 - If the user asks about a stock and you don't have technical data for it, acknowledge that and provide general guidance or offer to analyze it if they want`
 
     // Build messages array with conversation history
@@ -357,7 +393,6 @@ Remember:
       system: systemPrompt,
       messages,
       temperature: 0.7,
-      maxTokens: 600,
     })
 
     return Response.json({ response: aiResponse })
