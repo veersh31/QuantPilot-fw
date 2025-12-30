@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Search, Filter, TrendingUp, TrendingDown, Plus, X, Upload, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { searchStocks } from '@/lib/python-service'
 
 interface ScreenerFilters {
   minMarketCap: number
@@ -81,18 +82,8 @@ export function StockScreener() {
 
     setSearching(true)
     try {
-      const response = await fetch('/api/stocks/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: searchQuery }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setSearchResults(data.results)
-      } else {
-        toast.error('Search failed')
-      }
+      const data = await searchStocks(searchQuery)
+      setSearchResults(data.results)
     } catch (error) {
       console.error('Search error:', error)
       toast.error('Failed to search stocks')

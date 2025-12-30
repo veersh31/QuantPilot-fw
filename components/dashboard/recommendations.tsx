@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Lightbulb, TrendingUp, Shield, DollarSign, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { getRecommendations } from '@/lib/python-service'
 
 export interface Recommendation {
   type: 'rebalance' | 'diversify' | 'review' | 'tax' | 'dividend'
@@ -21,16 +22,8 @@ export function Recommendations({ portfolio }: { portfolio: any[] }) {
   useEffect(() => {
     const fetchRecommendations = async () => {
       try {
-        const response = await fetch('/api/recommendations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ portfolio }),
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          setRecommendations(data.recommendations)
-        }
+        const data = await getRecommendations(portfolio)
+        setRecommendations(data.recommendations)
       } catch (error) {
         console.error('Error fetching recommendations:', error)
       } finally {

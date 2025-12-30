@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { getNews, aiChat, getPredictions } from '@/lib/python-service'
 
 // Extract stock symbols from user message (e.g., AAPL, MSFT, GOOGL, or "apple", "amazon")
 function extractStockSymbols(message: string): string[] {
@@ -82,17 +83,8 @@ export function useChatWithAI() {
         let mlPredictions = null
         if (targetStock) {
           try {
-            // Call the Next.js ML API route which forwards to Python service
-            // This works both locally and on Vercel (if ML service is deployed)
-            const mlResponse = await fetch('/api/ml/predict', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ symbol: targetStock }),
-            })
-            if (mlResponse.ok) {
-              const data = await mlResponse.json()
-              mlPredictions = data.predictions
-            }
+            const data = await getPredictions(targetStock)
+            mlPredictions = data
           } catch (err) {
             console.log('ML predictions not available - ML service may not be running')
           }
@@ -103,9 +95,6 @@ export function useChatWithAI() {
         let marketNews: any[] = []
 
         try {
-          // Get unique symbols from portfolio
-          const portfolioSymbols = [...new Set(portfolio.map(stock => stock.symbol))]
-
           // Fetch news for each portfolio stock (limit to top 5 by portfolio weight to avoid too many requests)
           const topPortfolioStocks = portfolio
             .sort((a, b) => (b.price * b.quantity) - (a.price * a.quantity))
@@ -114,28 +103,17 @@ export function useChatWithAI() {
 
           const newsPromises = topPortfolioStocks.map(async (symbol) => {
             try {
-              const newsResponse = await fetch('/api/stocks/news', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ symbol }),
-              })
-              if (newsResponse.ok) {
-                const data = await newsResponse.json()
-                return { symbol, news: data.news || [] }
-              }
+              const data = await getNews(symbol) as { news: any[] }
+              return { symbol, news: data.news || [] }
             } catch (err) {
               console.log(`Failed to fetch news for ${symbol}`)
+              return { symbol, news: [] }
             }
-            return { symbol, news: [] }
           })
 
           // Fetch general market news (SPY as proxy for market)
-          const marketNewsPromise = fetch('/api/stocks/news', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ symbol: 'SPY' }),
-          }).then(res => res.ok ? res.json() : { news: [] })
-            .then(data => data.news || [])
+          const marketNewsPromise = getNews('SPY')
+            .then((data: any) => data.news || [])
             .catch(() => [])
 
           const [portfolioNewsResults, marketNewsResult] = await Promise.all([
@@ -144,7 +122,7 @@ export function useChatWithAI() {
           ])
 
           // Build portfolioNews object
-          portfolioNewsResults.forEach(result => {
+          portfolioNewsResults.forEach((result: { symbol: string, news: any[] }) => {
             if (result.news.length > 0) {
               portfolioNews[result.symbol] = result.news.slice(0, 3) // Top 3 for each stock
             }
@@ -155,31 +133,19 @@ export function useChatWithAI() {
           console.log('Failed to fetch portfolio/market news')
         }
 
-        const response = await fetch('/api/ai/chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            message: userMessage,
-            portfolio,
-            selectedStock,
-            conversationHistory: conversationHistory.map(msg => ({
-              role: msg.role,
-              content: msg.content
-            })),
-            mlPredictions,
-            portfolioNews,
-            marketNews,
-            timestamp: new Date().toISOString(),
-          }),
-        })
+        const data = await aiChat(
+          userMessage,
+          portfolio,
+          selectedStock || undefined,
+          conversationHistory.map(msg => ({
+            role: msg.role,
+            content: msg.content
+          })),
+          mlPredictions,
+          portfolioNews,
+          marketNews
+        ) as { response: string }
 
-        if (!response.ok) {
-          throw new Error('Failed to get AI response')
-        }
-
-        const data = await response.json()
         return data.response
       } catch (error) {
         console.error('Error calling AI API:', error)

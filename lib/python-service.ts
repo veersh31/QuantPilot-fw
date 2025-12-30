@@ -93,6 +93,72 @@ export async function getPredictions(symbol: string) {
 }
 
 /**
+ * Get news for a stock symbol
+ */
+export async function getNews(symbol: string) {
+  return callPythonService('/news', { symbol })
+}
+
+/**
+ * Search for stocks and ETFs
+ */
+export async function searchStocks(query: string) {
+  return callPythonService('/search', { query })
+}
+
+/**
+ * Generate trading signals from technical indicator data
+ */
+export async function getSignals(symbol: string, data: any) {
+  return callPythonService('/indicators/signals', { symbol, data })
+}
+
+/**
+ * AI chat assistant
+ */
+export async function aiChat(
+  message: string,
+  portfolio: any[] = [],
+  selectedStock?: string,
+  conversationHistory: any[] = [],
+  mlPredictions?: any,
+  portfolioNews: Record<string, any[]> = {},
+  marketNews: any[] = []
+) {
+  return callPythonService('/ai/chat', {
+    message,
+    portfolio,
+    selectedStock,
+    conversationHistory,
+    mlPredictions,
+    portfolioNews,
+    marketNews
+  })
+}
+
+/**
+ * Get portfolio recommendations
+ */
+export async function getRecommendations(
+  portfolio: any[],
+  metrics?: any,
+  selectedStock?: string
+) {
+  return callPythonService('/recommendations', {
+    portfolio,
+    metrics,
+    selectedStock
+  })
+}
+
+/**
+ * Get indicators timeseries data for charting
+ */
+export async function getIndicatorsTimeseries(symbol: string, days: number = 200) {
+  return callPythonService('/indicators/timeseries', { symbol, days })
+}
+
+/**
  * Check service health
  */
 export async function checkHealth() {

@@ -12,6 +12,13 @@ import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import time
+import requests
+import os
+from groq import Groq
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 from feature_engineering import engineer_dataset, normalize_features, extract_features
 from models import MLEnsemble, TimeSeriesModels, evaluate_model
@@ -80,6 +87,35 @@ class FeaturesRequest(BaseModel):
     days: Optional[int] = 730
 
 
+class NewsRequest(BaseModel):
+    symbol: str
+
+
+class SearchRequest(BaseModel):
+    query: str
+
+
+class SignalsRequest(BaseModel):
+    symbol: str
+    data: Dict[str, Any]
+
+
+class ChatRequest(BaseModel):
+    message: str
+    portfolio: List[Dict[str, Any]] = []
+    selectedStock: Optional[str] = None
+    conversationHistory: List[Dict[str, str]] = []
+    mlPredictions: Optional[Dict[str, Any]] = None
+    portfolioNews: Dict[str, List[Dict[str, Any]]] = {}
+    marketNews: List[Dict[str, Any]] = []
+
+
+class RecommendationsRequest(BaseModel):
+    portfolio: List[Dict[str, Any]]
+    metrics: Optional[Dict[str, Any]] = None
+    selectedStock: Optional[str] = None
+
+
 @app.get("/")
 async def root():
     return {
@@ -87,10 +123,12 @@ async def root():
         "version": "2.0.0",
         "status": "running",
         "endpoints": {
-            "stock_data": ["/quote", "/historical", "/fundamentals"],
-            "technical_analysis": ["/indicators"],
+            "stock_data": ["/quote", "/historical", "/fundamentals", "/news", "/search"],
+            "technical_analysis": ["/indicators", "/indicators/timeseries", "/indicators/signals"],
             "ml_features": ["/features"],
-            "ml_predictions": ["/predict"]
+            "ml_predictions": ["/predict"],
+            "ai": ["/ai/chat"],
+            "portfolio": ["/recommendations"]
         }
     }
 
@@ -587,6 +625,454 @@ async def predict(request: PredictionRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/news")
+async def get_news(request: NewsRequest):
+    """
+    Fetch news for a stock symbol using Finnhub API
+
+    Returns recent news articles from the last 7 days
+    """
+    symbol = request.symbol.upper()
+    cache_key = f"news:{symbol}"
+
+    try:
+        # Check cache (10 minute TTL for news)
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return cached_data
+
+        # Get API key from environment
+        api_key = os.getenv('FINNHUB_API_KEY')
+
+        if not api_key:
+            print("⚠ FINNHUB_API_KEY not configured, returning demo data")
+            # Return demo data if no API key
+            demo_news = get_demo_news(symbol)
+            return {"news": demo_news}
+
+        # Calculate date range (last 7 days)
+        today = datetime.now().strftime('%Y-%m-%d')
+        week_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+
+        # Fetch news from Finnhub
+        url = f"https://finnhub.io/api/v1/company-news?symbol={symbol}&from={week_ago}&to={today}&token={api_key}"
+        response = requests.get(url, timeout=10)
+
+        if not response.ok:
+            raise HTTPException(status_code=500, detail="Failed to fetch news from Finnhub")
+
+        data = response.json()
+
+        # Transform Finnhub response to our format
+        news = []
+        for item in data[:10]:  # Limit to 10 news items
+            news.append({
+                "title": item.get("headline", ""),
+                "summary": item.get("summary", ""),
+                "source": item.get("source", ""),
+                "url": item.get("url", ""),
+                "publishedAt": datetime.fromtimestamp(item.get("datetime", 0)).isoformat(),
+                "sentiment": item.get("sentiment", "neutral"),
+                "image": item.get("image", "")
+            })
+
+        result = {"news": news}
+
+        # Cache for 10 minutes
+        cache.set(cache_key, result, ttl=600)
+
+        return result
+
+    except Exception as e:
+        print(f"News API error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch news: {str(e)}")
+
+
+@app.post("/search")
+async def search_stocks(request: SearchRequest):
+    """
+    Search for stocks and ETFs by symbol or company name
+
+    Returns matching securities from Yahoo Finance
+    """
+    query = request.query.strip()
+
+    if not query:
+        raise HTTPException(status_code=400, detail="Query is required")
+
+    cache_key = f"search:{query.lower()}"
+
+    try:
+        # Check cache (1 hour TTL for search results)
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return cached_data
+
+        print(f"[Search] Searching for: {query}")
+
+        # Use yfinance Ticker search through Yahoo Finance web API
+        # Note: yfinance doesn't have a direct search API, so we'll use a workaround
+        # Try to get ticker info directly if it looks like a symbol
+        if len(query) <= 5 and query.isupper():
+            try:
+                ticker = yf.Ticker(query)
+                info = ticker.info
+
+                results = [{
+                    "symbol": query,
+                    "name": info.get('shortName') or info.get('longName', query),
+                    "type": info.get('quoteType', 'EQUITY'),
+                    "exchange": info.get('exchange', '')
+                }]
+
+                result = {"results": results}
+                cache.set(cache_key, result, ttl=3600)
+                return result
+            except:
+                pass
+
+        # For company name searches, use a simple mapping of popular stocks
+        # In production, you'd want to use a proper search API or database
+        popular_stocks = get_popular_stocks_mapping()
+
+        results = []
+        query_lower = query.lower()
+
+        # Search through popular stocks
+        for symbol, data in popular_stocks.items():
+            if (query_lower in symbol.lower() or
+                query_lower in data['name'].lower()):
+                results.append({
+                    "symbol": symbol,
+                    "name": data['name'],
+                    "type": data['type'],
+                    "exchange": data['exchange']
+                })
+
+        # Limit to top 10 results
+        results = results[:10]
+
+        result = {"results": results}
+
+        # Cache for 1 hour
+        cache.set(cache_key, result, ttl=3600)
+
+        return result
+
+    except Exception as e:
+        print(f"Search error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to search stocks: {str(e)}")
+
+
+@app.post("/indicators/signals")
+async def generate_signals(request: SignalsRequest):
+    """
+    Generate trading signals from technical indicator data
+
+    Analyzes RSI, MACD, Bollinger Bands to produce actionable signals
+    """
+    symbol = request.symbol.upper()
+    data = request.data
+
+    try:
+        signals = []
+
+        # RSI signals
+        if 'rsi' in data and data['rsi'] is not None:
+            rsi = float(data['rsi'])
+            if rsi < 30:
+                signals.append({
+                    "type": "bullish",
+                    "indicator": "RSI Oversold",
+                    "signal": f"RSI at {rsi:.2f} - Potential oversold condition, watch for reversal",
+                    "confidence": 0.75,
+                    "timestamp": datetime.now().isoformat()
+                })
+            elif rsi > 70:
+                signals.append({
+                    "type": "bearish",
+                    "indicator": "RSI Overbought",
+                    "signal": f"RSI at {rsi:.2f} - Potential overbought condition",
+                    "confidence": 0.75,
+                    "timestamp": datetime.now().isoformat()
+                })
+
+        # MACD signals
+        if all(k in data for k in ['macd', 'signal', 'histogram']):
+            macd = float(data['macd'])
+            signal = float(data['signal'])
+            histogram = float(data['histogram'])
+
+            if histogram > 0 and macd > signal:
+                signals.append({
+                    "type": "bullish",
+                    "indicator": "MACD Crossover",
+                    "signal": "Bullish MACD crossover detected - Uptrend strengthening",
+                    "confidence": 0.82,
+                    "timestamp": datetime.now().isoformat()
+                })
+            elif histogram < 0 and macd < signal:
+                signals.append({
+                    "type": "bearish",
+                    "indicator": "MACD Crossover",
+                    "signal": "Bearish MACD crossover - Downtrend detected",
+                    "confidence": 0.82,
+                    "timestamp": datetime.now().isoformat()
+                })
+
+        # Bollinger Bands signals
+        if all(k in data for k in ['price', 'bollinger_upper', 'bollinger_lower']):
+            price = float(data['price'])
+            bb_upper = float(data['bollinger_upper'])
+            bb_lower = float(data['bollinger_lower'])
+
+            if price > bb_upper:
+                signals.append({
+                    "type": "warning",
+                    "indicator": "Bollinger Band",
+                    "signal": "Price above upper band - High volatility, potential pullback",
+                    "confidence": 0.68,
+                    "timestamp": datetime.now().isoformat()
+                })
+            elif price < bb_lower:
+                signals.append({
+                    "type": "bullish",
+                    "indicator": "Bollinger Band",
+                    "signal": "Price below lower band - Volatility extreme, potential bounce",
+                    "confidence": 0.72,
+                    "timestamp": datetime.now().isoformat()
+                })
+
+        return {"signals": signals}
+
+    except Exception as e:
+        print(f"Signal generation error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate signals: {str(e)}")
+
+
+@app.post("/ai/chat")
+async def ai_chat(request: ChatRequest):
+    """
+    AI-powered chat assistant with stock analysis and recommendations
+
+    Integrates ML predictions, technical analysis, news, and portfolio context
+    """
+    try:
+        # Extract stock symbols from message
+        mentioned_symbols = extract_stock_symbols(request.message)
+
+        # Use the first mentioned symbol, or fall back to selectedStock
+        target_stock = mentioned_symbols[0] if mentioned_symbols else request.selectedStock
+
+        # Fetch technical indicators for the target stock
+        technical_data = None
+        is_etf = False
+        quote_type = 'stock'
+
+        if target_stock:
+            # Get technical indicators
+            indicators_request = IndicatorsRequest(symbol=target_stock, days=200)
+            try:
+                indicators_response = await calculate_indicators(indicators_request)
+                technical_data = indicators_response.get('analysis')
+            except:
+                pass
+
+            # Check if it's an ETF
+            try:
+                ticker = yf.Ticker(target_stock)
+                info = ticker.info
+                if info.get('quoteType') == 'ETF':
+                    is_etf = True
+                    quote_type = 'ETF'
+            except:
+                pass
+
+        # Fetch news for target stock
+        news_data = []
+        if target_stock:
+            try:
+                news_request = NewsRequest(symbol=target_stock)
+                news_response = await get_news(news_request)
+                news_data = news_response.get('news', [])
+            except:
+                pass
+
+        # Build context
+        portfolio_context = generate_portfolio_context(request.portfolio)
+        technical_context = generate_technical_context(target_stock, technical_data, mentioned_symbols)
+        news_context = generate_news_context(target_stock, news_data, request.portfolioNews, request.marketNews)
+        ml_context = generate_ml_context(target_stock, request.mlPredictions)
+        asset_type_guidance = generate_asset_type_guidance(is_etf)
+
+        # Build system prompt
+        system_prompt = f"""You are an expert AI trading advisor for QuantPilot with 20+ years of experience in quantitative finance and machine learning.
+
+When responding:
+1. Keep responses SHORT and FOCUSED - maximum 3-4 key points
+2. Use clear, direct language - no excessive markdown or formatting
+3. PRIORITIZE ML predictions when available - cite EXACT predicted prices and returns
+4. Combine ML predictions with technical indicators for comprehensive analysis
+5. **IMPORTANT**: You have access to news for:
+   - The target stock being discussed
+   - ALL stocks in the user's portfolio
+   - General market news (S&P 500/SPY)
+   When news is available, reference specific headlines, their sentiment, and how they impact portfolio holdings
+6. If user asks about portfolio or market sentiment, analyze news across all holdings and market trends
+7. Give one primary recommendation based on data-driven analysis
+8. Mention 1-2 risks or considerations
+9. End with a clear actionable suggestion
+
+IMPORTANT: You can answer questions about ANY stock, not just the one currently selected. If the user asks about a specific stock symbol (e.g., AAPL, MSFT, TSLA), provide analysis for that stock even if a different stock is selected in the UI.
+
+{asset_type_guidance}
+
+{portfolio_context}
+
+{news_context}
+
+{ml_context}
+
+{technical_context}
+
+Remember:
+- When ML predictions are available, ALWAYS cite the exact predicted prices and percentage returns
+- You have access to news for PORTFOLIO stocks and MARKET trends - use this to identify broader impacts
+- If user asks "what's happening with my portfolio?" or "how's the market?", analyze all portfolio stock news and market news
+- Combine news sentiment across holdings, ML forecasts, and technical analysis for comprehensive recommendations
+- Base your analysis on REAL data provided above, not generic advice
+- The ML model uses 29+ quantitative features and has been backtested
+- When discussing portfolio risk, consider news sentiment across all holdings
+- If the user asks about a stock and you don't have technical data for it, acknowledge that and provide general guidance or offer to analyze it if they want"""
+
+        # Build messages array
+        messages = []
+
+        # Add conversation history (last 10 messages)
+        for msg in request.conversationHistory[-10:]:
+            role = "user" if msg.get("role") == "user" else "assistant"
+            messages.append({
+                "role": role,
+                "content": msg.get("content", "")
+            })
+
+        # Add current message if not in history
+        if not any(msg.get("content") == request.message for msg in request.conversationHistory):
+            messages.append({
+                "role": "user",
+                "content": request.message
+            })
+
+        # Get Groq API key
+        groq_api_key = os.getenv('GROQ_API_KEY')
+        if not groq_api_key:
+            raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured")
+
+        # Call Groq API
+        client = Groq(api_key=groq_api_key)
+
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                *messages
+            ],
+            model="llama-3.3-70b-versatile",
+            temperature=0.7,
+            max_tokens=1024
+        )
+
+        ai_response = chat_completion.choices[0].message.content
+
+        return {"response": ai_response}
+
+    except Exception as e:
+        print(f"AI Chat error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to generate AI response: {str(e)}")
+
+
+@app.post("/recommendations")
+async def get_recommendations(request: RecommendationsRequest):
+    """
+    Generate portfolio recommendations for rebalancing and optimization
+
+    Analyzes portfolio allocation, diversification, and performance
+    """
+    try:
+        recommendations = []
+
+        if not request.portfolio:
+            return {"recommendations": []}
+
+        # Calculate total portfolio value
+        total_value = sum(stock.get('price', 0) * stock.get('quantity', 0)
+                         for stock in request.portfolio)
+
+        if total_value == 0:
+            return {"recommendations": []}
+
+        # Rebalancing recommendations
+        rebalancing_needed = []
+        for stock in request.portfolio:
+            price = stock.get('price', 0)
+            quantity = stock.get('quantity', 0)
+            symbol = stock.get('symbol', '')
+
+            allocation = (price * quantity) / total_value * 100
+
+            if allocation > 40 or allocation < 5:
+                rebalancing_needed.append(symbol)
+
+        if rebalancing_needed:
+            recommendations.append({
+                "type": "rebalance",
+                "title": "Portfolio Rebalancing",
+                "description": f"{', '.join(rebalancing_needed)} positions are outside optimal allocation ranges",
+                "action": "Review and rebalance to maintain risk profile",
+                "priority": "medium"
+            })
+
+        # Diversification recommendations
+        if len(request.portfolio) < 5:
+            recommendations.append({
+                "type": "diversify",
+                "title": "Increase Diversification",
+                "description": "Current portfolio has limited diversification. Consider adding positions across different sectors.",
+                "action": "Add 2-3 positions in uncorrelated assets",
+                "priority": "medium"
+            })
+
+        # Performance recommendations
+        if request.metrics and request.metrics.get('totalReturn', 0) < -5:
+            recommendations.append({
+                "type": "review",
+                "title": "Portfolio Review Recommended",
+                "description": "Recent performance is underperforming benchmarks. Review strategy and holdings.",
+                "action": "Analyze underperforming positions",
+                "priority": "high"
+            })
+
+        # Dividend optimization
+        dividend_stocks = [s.get('symbol', '') for s in request.portfolio
+                          if s.get('dividend', 0) > 0]
+
+        if dividend_stocks:
+            recommendations.append({
+                "type": "dividend",
+                "title": "Dividend Reinvestment",
+                "description": f"{', '.join(dividend_stocks)} pay dividends. Consider reinvestment strategy.",
+                "action": "Set up dividend reinvestment plan (DRIP)",
+                "priority": "low"
+            })
+
+        return {"recommendations": recommendations}
+
+    except Exception as e:
+        print(f"Recommendations error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate recommendations: {str(e)}")
+
+
 def generate_recommendation(expected_return: float, confidence: float) -> str:
     """Generate buy/sell recommendation"""
     if confidence < 0.6:
@@ -632,6 +1118,327 @@ Models: Ridge Regression, Lasso, Random Forest, Gradient Boosting, ARIMA, Expone
     return analysis
 
 
+def get_demo_news(symbol: str) -> List[Dict]:
+    """Generate demo news data when API key is not available"""
+    return [
+        {
+            "title": f"{symbol} Reports Strong Quarterly Earnings",
+            "summary": "Company beats analyst expectations with revenue growth of 15% year-over-year.",
+            "source": "Financial Times",
+            "url": "#",
+            "publishedAt": (datetime.now() - timedelta(hours=2)).isoformat(),
+            "sentiment": "positive",
+            "image": ""
+        },
+        {
+            "title": f"Analysts Upgrade {symbol} to 'Buy' Rating",
+            "summary": "Major investment firms increase price targets following strong performance.",
+            "source": "Bloomberg",
+            "url": "#",
+            "publishedAt": (datetime.now() - timedelta(hours=5)).isoformat(),
+            "sentiment": "positive",
+            "image": ""
+        }
+    ]
+
+
+def get_popular_stocks_mapping() -> Dict[str, Dict[str, str]]:
+    """Mapping of popular stocks for search functionality"""
+    return {
+        'AAPL': {'name': 'Apple Inc.', 'type': 'EQUITY', 'exchange': 'NASDAQ'},
+        'MSFT': {'name': 'Microsoft Corporation', 'type': 'EQUITY', 'exchange': 'NASDAQ'},
+        'GOOGL': {'name': 'Alphabet Inc.', 'type': 'EQUITY', 'exchange': 'NASDAQ'},
+        'AMZN': {'name': 'Amazon.com Inc.', 'type': 'EQUITY', 'exchange': 'NASDAQ'},
+        'META': {'name': 'Meta Platforms Inc.', 'type': 'EQUITY', 'exchange': 'NASDAQ'},
+        'TSLA': {'name': 'Tesla Inc.', 'type': 'EQUITY', 'exchange': 'NASDAQ'},
+        'NVDA': {'name': 'NVIDIA Corporation', 'type': 'EQUITY', 'exchange': 'NASDAQ'},
+        'AMD': {'name': 'Advanced Micro Devices', 'type': 'EQUITY', 'exchange': 'NASDAQ'},
+        'NFLX': {'name': 'Netflix Inc.', 'type': 'EQUITY', 'exchange': 'NASDAQ'},
+        'DIS': {'name': 'The Walt Disney Company', 'type': 'EQUITY', 'exchange': 'NYSE'},
+        'PYPL': {'name': 'PayPal Holdings Inc.', 'type': 'EQUITY', 'exchange': 'NASDAQ'},
+        'INTC': {'name': 'Intel Corporation', 'type': 'EQUITY', 'exchange': 'NASDAQ'},
+        'CSCO': {'name': 'Cisco Systems Inc.', 'type': 'EQUITY', 'exchange': 'NASDAQ'},
+        'ADBE': {'name': 'Adobe Inc.', 'type': 'EQUITY', 'exchange': 'NASDAQ'},
+        'CRM': {'name': 'Salesforce Inc.', 'type': 'EQUITY', 'exchange': 'NYSE'},
+        'ORCL': {'name': 'Oracle Corporation', 'type': 'EQUITY', 'exchange': 'NYSE'},
+        'IBM': {'name': 'International Business Machines', 'type': 'EQUITY', 'exchange': 'NYSE'},
+        'QCOM': {'name': 'QUALCOMM Incorporated', 'type': 'EQUITY', 'exchange': 'NASDAQ'},
+        'TXN': {'name': 'Texas Instruments', 'type': 'EQUITY', 'exchange': 'NASDAQ'},
+        'AVGO': {'name': 'Broadcom Inc.', 'type': 'EQUITY', 'exchange': 'NASDAQ'},
+        'COST': {'name': 'Costco Wholesale Corporation', 'type': 'EQUITY', 'exchange': 'NASDAQ'},
+        'PEP': {'name': 'PepsiCo Inc.', 'type': 'EQUITY', 'exchange': 'NASDAQ'},
+        'KO': {'name': 'The Coca-Cola Company', 'type': 'EQUITY', 'exchange': 'NYSE'},
+        'WMT': {'name': 'Walmart Inc.', 'type': 'EQUITY', 'exchange': 'NYSE'},
+        'JPM': {'name': 'JPMorgan Chase & Co.', 'type': 'EQUITY', 'exchange': 'NYSE'},
+        'BAC': {'name': 'Bank of America Corporation', 'type': 'EQUITY', 'exchange': 'NYSE'},
+        'WFC': {'name': 'Wells Fargo & Company', 'type': 'EQUITY', 'exchange': 'NYSE'},
+        'GS': {'name': 'The Goldman Sachs Group', 'type': 'EQUITY', 'exchange': 'NYSE'},
+        'MS': {'name': 'Morgan Stanley', 'type': 'EQUITY', 'exchange': 'NYSE'},
+        'C': {'name': 'Citigroup Inc.', 'type': 'EQUITY', 'exchange': 'NYSE'},
+        'V': {'name': 'Visa Inc.', 'type': 'EQUITY', 'exchange': 'NYSE'},
+        'MA': {'name': 'Mastercard Incorporated', 'type': 'EQUITY', 'exchange': 'NYSE'},
+        'JNJ': {'name': 'Johnson & Johnson', 'type': 'EQUITY', 'exchange': 'NYSE'},
+        'UNH': {'name': 'UnitedHealth Group', 'type': 'EQUITY', 'exchange': 'NYSE'},
+        'PFE': {'name': 'Pfizer Inc.', 'type': 'EQUITY', 'exchange': 'NYSE'},
+        'ABBV': {'name': 'AbbVie Inc.', 'type': 'EQUITY', 'exchange': 'NYSE'},
+        'XOM': {'name': 'Exxon Mobil Corporation', 'type': 'EQUITY', 'exchange': 'NYSE'},
+        'CVX': {'name': 'Chevron Corporation', 'type': 'EQUITY', 'exchange': 'NYSE'},
+        'SPY': {'name': 'SPDR S&P 500 ETF Trust', 'type': 'ETF', 'exchange': 'NYSE'},
+        'QQQ': {'name': 'Invesco QQQ Trust', 'type': 'ETF', 'exchange': 'NASDAQ'},
+        'IWM': {'name': 'iShares Russell 2000 ETF', 'type': 'ETF', 'exchange': 'NYSE'},
+        'VTI': {'name': 'Vanguard Total Stock Market ETF', 'type': 'ETF', 'exchange': 'NYSE'},
+    }
+
+
+def extract_stock_symbols(message: str) -> List[str]:
+    """Extract stock symbols from user message"""
+    import re
+
+    lower_message = message.lower()
+
+    # Company name to symbol mapping
+    company_map = {
+        'apple': 'AAPL', 'microsoft': 'MSFT', 'google': 'GOOGL', 'alphabet': 'GOOGL',
+        'amazon': 'AMZN', 'meta': 'META', 'facebook': 'META', 'tesla': 'TSLA',
+        'nvidia': 'NVDA', 'amd': 'AMD', 'netflix': 'NFLX', 'disney': 'DIS',
+        'paypal': 'PYPL', 'intel': 'INTC', 'cisco': 'CSCO', 'adobe': 'ADBE',
+        'salesforce': 'CRM', 'oracle': 'ORCL', 'ibm': 'IBM', 'qualcomm': 'QCOM',
+        'texas instruments': 'TXN', 'broadcom': 'AVGO', 'costco': 'COST',
+        'pepsi': 'PEP', 'coca cola': 'KO', 'walmart': 'WMT',
+        'jpmorgan': 'JPM', 'jp morgan': 'JPM', 'bank of america': 'BAC',
+        'wells fargo': 'WFC', 'goldman sachs': 'GS', 'morgan stanley': 'MS',
+        'citigroup': 'C', 'visa': 'V', 'mastercard': 'MA',
+        'johnson & johnson': 'JNJ', 'unitedhealth': 'UNH', 'pfizer': 'PFE',
+        'abbvie': 'ABBV', 'exxon': 'XOM', 'chevron': 'CVX'
+    }
+
+    # Check for company names first
+    for name, symbol in company_map.items():
+        if name in lower_message:
+            return [symbol]
+
+    # Then check for uppercase stock symbols
+    symbol_pattern = r'\b[A-Z]{1,5}\b'
+    matches = re.findall(symbol_pattern, message)
+    common_words = ['I', 'A', 'THE', 'AND', 'OR', 'BUT', 'FOR', 'NOT', 'WITH',
+                   'AS', 'AT', 'BY', 'TO', 'FROM', 'IN', 'ON', 'OF', 'IS',
+                   'IT', 'AI', 'ML', 'USA', 'US', 'ETF', 'PE', 'PS', 'PB',
+                   'RSI', 'MACD', 'SMA', 'EMA', 'OK', 'CEO', 'CFO', 'IPO',
+                   'API', 'FAQ']
+    return [m for m in matches if m not in common_words]
+
+
+def generate_portfolio_context(portfolio: List[Dict]) -> str:
+    """Generate portfolio context string for AI chat"""
+    if not portfolio:
+        return 'The user has no holdings in their portfolio yet.'
+
+    total_value = sum(stock.get('price', 0) * stock.get('quantity', 0) for stock in portfolio)
+
+    holdings = []
+    for stock in portfolio:
+        symbol = stock.get('symbol', '')
+        quantity = stock.get('quantity', 0)
+        price = stock.get('price', 0)
+        value = price * quantity
+        allocation = (value / total_value * 100) if total_value > 0 else 0
+
+        holdings.append(
+            f"{symbol}: {quantity} shares @ ${price:.2f} ({allocation:.1f}% of portfolio)"
+        )
+
+    holdings_str = '\n'.join(holdings)
+    return f"Portfolio Summary:\n{holdings_str}\nTotal Portfolio Value: ${total_value:.2f}"
+
+
+def generate_technical_context(target_stock: Optional[str],
+                               technical_data: Optional[Dict],
+                               mentioned_symbols: List[str]) -> str:
+    """Generate technical analysis context string for AI chat"""
+    if not target_stock:
+        return 'User has not specified a particular stock. Feel free to answer general questions or ask them to specify a stock symbol for detailed analysis.'
+
+    if not technical_data:
+        return f"User is asking about {target_stock} - fetching technical data..."
+
+    context_prefix = (
+        f"User is asking about {target_stock}. Here are the real technical indicators:"
+        if mentioned_symbols
+        else f"Currently viewing {target_stock} with real technical indicators:"
+    )
+
+    rsi = technical_data.get('rsi', {})
+    macd = technical_data.get('macd', {})
+    bb = technical_data.get('bollingerBands', {})
+    ma = technical_data.get('movingAverages', {})
+    stoch = technical_data.get('stochastic', {})
+    overall = technical_data.get('overallSignal', 'neutral')
+
+    return f"""
+{context_prefix}
+
+RSI: {rsi.get('value', 0):.2f} ({rsi.get('signal', 'neutral')}) - {rsi.get('description', '')}
+
+MACD: {macd.get('macd', 0):.2f}, Signal: {macd.get('signal', 0):.2f}, Histogram: {macd.get('histogram', 0):.2f}
+Trend: {macd.get('trend', 'neutral')} - {macd.get('description', '')}
+
+Bollinger Bands: Upper {bb.get('upper', 0):.2f}, Middle {bb.get('middle', 0):.2f}, Lower {bb.get('lower', 0):.2f}
+Position: {bb.get('position', 'neutral')} - {bb.get('description', '')}
+
+Moving Averages:
+- SMA20: {ma.get('sma20', 0):.2f}
+- SMA50: {ma.get('sma50', 0):.2f}
+- SMA200: {ma.get('sma200', 0):.2f}
+Trend: {ma.get('trend', 'neutral')} - {ma.get('description', '')}
+
+Stochastic: %K {stoch.get('k', 0):.2f}, %D {stoch.get('d', 0):.2f}
+Signal: {stoch.get('signal', 'neutral')} - {stoch.get('description', '')}
+
+OVERALL SIGNAL: {overall.upper().replace('_', ' ')}"""
+
+
+def get_time_ago(date_string: str) -> str:
+    """Format time ago from ISO date string"""
+    try:
+        date = datetime.fromisoformat(date_string.replace('Z', '+00:00'))
+        now = datetime.now(date.tzinfo) if date.tzinfo else datetime.now()
+        diff = now - date
+        diff_hours = int(diff.total_seconds() / 3600)
+        diff_days = diff_hours // 24
+
+        if diff_days > 0:
+            return f"{diff_days}d ago"
+        elif diff_hours > 0:
+            return f"{diff_hours}h ago"
+        else:
+            return "Just now"
+    except:
+        return "Recently"
+
+
+def generate_news_context(target_stock: Optional[str],
+                         news_data: List[Dict],
+                         portfolio_news: Dict[str, List[Dict]],
+                         market_news: List[Dict]) -> str:
+    """Generate news context string for AI chat"""
+    context_parts = []
+
+    # Target stock news
+    if news_data and target_stock:
+        context_parts.append(f"\n📰 LATEST NEWS FOR {target_stock}:")
+        for idx, item in enumerate(news_data[:5], 1):
+            time_ago = get_time_ago(item.get('publishedAt', ''))
+            context_parts.append(f"""
+{idx}. {item.get('title', '')}
+   Summary: {item.get('summary', '')}
+   Source: {item.get('source', '')} | {time_ago}
+   Sentiment: {item.get('sentiment', 'neutral')}""")
+    elif target_stock:
+        context_parts.append(f"No recent news available for {target_stock}.")
+
+    # Portfolio stocks news
+    if portfolio_news:
+        context_parts.append("\n📊 PORTFOLIO STOCKS NEWS:")
+        for symbol, stock_news in portfolio_news.items():
+            if stock_news:
+                context_parts.append(f"\n{symbol}:")
+                for idx, item in enumerate(stock_news[:2], 1):
+                    time_ago = get_time_ago(item.get('publishedAt', ''))
+                    context_parts.append(
+                        f"  {idx}. {item.get('title', '')}\n"
+                        f"     {item.get('summary', '')}\n"
+                        f"     {time_ago} | {item.get('sentiment', 'neutral')}"
+                    )
+
+    # Market news
+    if market_news:
+        context_parts.append("\n📈 GENERAL MARKET NEWS (SPY/S&P 500):")
+        for idx, item in enumerate(market_news[:3], 1):
+            time_ago = get_time_ago(item.get('publishedAt', ''))
+            context_parts.append(
+                f"{idx}. {item.get('title', '')}\n"
+                f"   {item.get('summary', '')}\n"
+                f"   {time_ago} | {item.get('sentiment', 'neutral')}"
+            )
+
+    if context_parts:
+        context_parts.append("\nWhen discussing news, reference these actual headlines and their sentiment.")
+        return '\n'.join(context_parts)
+
+    return ''
+
+
+def generate_ml_context(target_stock: Optional[str], ml_predictions: Optional[Dict]) -> str:
+    """Generate ML predictions context string for AI chat"""
+    if not ml_predictions or not target_stock:
+        return ''
+
+    pred = ml_predictions.get('predictions', {})
+    backtest = ml_predictions.get('backtest', {})
+
+    context_parts = [
+        f"\n🤖 MACHINE LEARNING PRICE PREDICTIONS FOR {target_stock}:",
+        f"Current Price: ${ml_predictions.get('current_price', 0)}"
+    ]
+
+    # Next day prediction
+    if 'nextDay' in pred:
+        nd = pred['nextDay']
+        context_parts.append(f"""
+📊 Next Day Prediction:
+   Price: ${nd.get('predictedPrice', 0)} ({'+' if nd.get('predictedReturn', 0) > 0 else ''}{nd.get('predictedReturn', 0)}% return)
+   Confidence: {int(nd.get('confidence', 0) * 100)}%
+   Range: ${nd.get('lowerBound', 0):.2f} - ${nd.get('upperBound', 0):.2f}""")
+
+    # Next week prediction
+    if 'nextWeek' in pred:
+        nw = pred['nextWeek']
+        context_parts.append(f"""
+📈 Next Week Prediction:
+   Price: ${nw.get('predictedPrice', 0)} ({'+' if nw.get('predictedReturn', 0) > 0 else ''}{nw.get('predictedReturn', 0)}% return)
+   Confidence: {int(nw.get('confidence', 0) * 100)}%""")
+
+    # Next month prediction
+    if 'nextMonth' in pred:
+        nm = pred['nextMonth']
+        context_parts.append(f"""
+📉 Next Month Prediction:
+   Price: ${nm.get('predictedPrice', 0)} ({'+' if nm.get('predictedReturn', 0) > 0 else ''}{nm.get('predictedReturn', 0)}% return)
+   Confidence: {int(nm.get('confidence', 0) * 100)}%""")
+
+    # Backtest results
+    if backtest:
+        context_parts.append(f"""
+🎯 Model Performance (Backtesting):
+   Total Returns: {'+' if backtest.get('totalReturns', 0) > 0 else ''}{backtest.get('totalReturns', 0)}%
+   Win Rate: {backtest.get('winRate', 0)}%
+   Sharpe Ratio: {backtest.get('sharpeRatio', 0)}
+   Max Drawdown: {backtest.get('maxDrawdown', 0)}%""")
+
+    context_parts.append(f"""
+⚠️ CRITICAL: When discussing {target_stock} price predictions, YOU MUST cite these EXACT predicted values above. Never estimate or guess - use the precise numbers provided by the ML model.""")
+
+    return '\n'.join(context_parts)
+
+
+def generate_asset_type_guidance(is_etf: bool) -> str:
+    """Generate asset-type specific guidance for AI chat"""
+    if is_etf:
+        return """IMPORTANT: You are analyzing an ETF (Exchange-Traded Fund), NOT an individual stock.
+- ETFs are baskets of securities that track indices, sectors, or themes
+- Focus on: expense ratio, diversification, holdings, tracking error, sector exposure
+- DO NOT mention: earnings, profit margins, company fundamentals, P/E ratios
+- Consider: market trends, sector rotation, risk diversification
+- ETFs are passive investments - analyze based on composition and cost efficiency"""
+    else:
+        return """You are analyzing an individual stock.
+- Focus on: company fundamentals, earnings, growth, competitive position
+- Use valuation metrics: P/E, P/S, P/B ratios
+- Consider: profitability, debt levels, management quality
+- Evaluate competitive advantages and market position"""
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

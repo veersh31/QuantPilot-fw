@@ -1,14 +1,15 @@
 'use client'
 
-import { BarChart3, Settings, Moon, Sun, LogOut, User, Shield, TrendingUp } from 'lucide-react'
+import { BarChart3, Moon, Sun, Shield, TrendingUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTheme } from 'next-themes'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/auth-context'
+import { UserNav } from '@/components/auth/user-nav'
 
 export function DashboardHeader() {
   const { theme, setTheme } = useTheme()
-  const { profile, isAuthenticated, currentMode, setCurrentMode, logout } = useAuth()
+  const { isAuthenticated, currentMode, setCurrentMode } = useAuth()
   const [mounted, setMounted] = useState(false)
 
   // Avoid hydration mismatch
@@ -63,16 +64,8 @@ export function DashboardHeader() {
                 {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
               </Button>
 
-              {/* Profile */}
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted">
-                <User size={16} className="text-muted-foreground" />
-                <span className="text-sm font-medium hidden sm:inline">{profile?.username}</span>
-              </div>
-
-              {/* Logout */}
-              <Button variant="ghost" size="icon" onClick={logout} title="Logout">
-                <LogOut size={20} />
-              </Button>
+              {/* User Profile Navigation */}
+              <UserNav />
             </>
           )}
         </div>

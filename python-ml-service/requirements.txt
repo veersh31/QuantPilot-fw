@@ -13,6 +13,9 @@ scipy==1.11.4
 # Stock data
 yfinance==0.2.32
 
+# AI/LLM
+groq==0.4.1
+
 # Optional: Deep Learning (uncomment if needed)
 # tensorflow==2.15.0
 # keras==2.15.0

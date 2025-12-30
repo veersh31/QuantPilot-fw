@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Newspaper, ExternalLink, Clock } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import { getNews } from '@/lib/python-service'
 
 interface NewsItem {
   title: string
@@ -28,18 +29,7 @@ export function StockNews({ symbol }: StockNewsProps) {
 
       setLoading(true)
       try {
-        // Fetch real news from API
-        const response = await fetch('/api/stocks/news', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ symbol }),
-        })
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch news')
-        }
-
-        const data = await response.json()
+        const data = await getNews(symbol)
         setNews(data.news || [])
       } catch (error) {
         console.error('Error fetching news:', error)

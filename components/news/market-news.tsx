@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Newspaper, TrendingUp, Globe, ExternalLink, Calendar, Building2 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
+import { getNews } from '@/lib/python-service'
 
 interface NewsItem {
   title: string
@@ -67,15 +68,8 @@ export function MarketNews({ selectedStock }: MarketNewsProps) {
   const fetchMarketNews = async () => {
     setLoading(true)
     try {
-      const response = await fetch('/api/stocks/news', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol: 'SPY' }),
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setMarketNews(data.news || [])
-      }
+      const data = await getNews('SPY')
+      setMarketNews(data.news || [])
     } catch (error) {
       console.error('Failed to fetch market news:', error)
     } finally {
@@ -86,15 +80,8 @@ export function MarketNews({ selectedStock }: MarketNewsProps) {
   const fetchStockNews = async (symbol: string) => {
     setLoading(true)
     try {
-      const response = await fetch('/api/stocks/news', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol }),
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setStockNews(data.news || [])
-      }
+      const data = await getNews(symbol)
+      setStockNews(data.news || [])
     } catch (error) {
       console.error('Failed to fetch stock news:', error)
     } finally {

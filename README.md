@@ -1,281 +1,252 @@
-# QuantPilot - AI-Powered Portfolio Analytics Platform
+# 🚀 QuantPilot - AI-Powered Trading Platform
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/c9shad0ww-gmailcoms-projects/v0-stock-analytics-chatbot)
-[![Built with Next.js](https://img.shields.io/badge/Built%20with-Next.js%2016-black?style=for-the-badge&logo=next.js)](https://nextjs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
+Professional AI-powered stock trading platform with ML predictions, technical analysis, and real-time insights.
 
-## 🚀 Overview
+![Next.js](https://img.shields.io/badge/Next.js-16.0-black)
+![Python](https://img.shields.io/badge/Python-3.9+-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.104-green)
+![Supabase](https://img.shields.io/badge/Supabase-Auth-orange)
 
-QuantPilot is a comprehensive, professional-grade portfolio analytics platform that combines real-time market data, advanced analytics, machine learning predictions, and AI-powered insights to help investors make informed decisions.
+## ✨ Features
 
-**Live Demo:** [https://vercel.com/c9shad0ww-gmailcoms-projects/v0-stock-analytics-chatbot](https://vercel.com/c9shad0ww-gmailcoms-projects/v0-stock-analytics-chatbot)
+### 🤖 **AI & Machine Learning**
+- ML price predictions (next day, week, month)
+- AI chatbot powered by Groq LLM
+- 40+ engineered features
+- Ensemble ML models (Ridge, Lasso, Random Forest, Gradient Boosting)
+- Backtesting with performance metrics
 
-## ✨ Key Features
+### 📊 **Technical Analysis**
+- 14+ technical indicators (RSI, MACD, Bollinger Bands, Stochastic, ADX, Williams %R, CCI, VWAP)
+- Real-time charting
+- Trading signals
+- Pattern recognition
 
-### 📊 Portfolio Management
-- **Real-time Portfolio Tracking** - Track your holdings with live price updates (60-second refresh)
-- **Performance Metrics** - Comprehensive analytics including total value, gains/losses, and returns
-- **Transaction Manager** - Record and track all buy/sell transactions with detailed history
-- **Paper Trading** - Practice trading strategies with virtual cash without risking real money
-- **CSV Export** - Export your portfolio data for external analysis
+### 💼 **Portfolio Management**
+- Multi-portfolio support
+- Real-time tracking
+- Profit/loss calculations
+- Portfolio recommendations
+- Rebalancing suggestions
+- Watchlist functionality
 
-### 💰 Dividend Tracking
-- **Annual & Quarterly Projections** - Forecast your dividend income
-- **Portfolio Dividend Yield** - Weighted average yield across all holdings
-- **Income Distribution** - Visual breakdown of dividend income by stock
-- **Monthly Income Calendar** - See projected monthly dividend payments
-- **Dividend Stock Analysis** - Identify high-yield opportunities
+### 📰 **Market Intelligence**
+- Real-time stock news from Finnhub
+- Sentiment analysis
+- Market updates
+- Company fundamentals
 
-### 🔄 Portfolio Rebalancing
-- **Target Allocation Setting** - Define your ideal portfolio balance
-- **Automatic Calculations** - Get exact buy/sell recommendations
-- **Visual Comparison** - Side-by-side pie charts of current vs target allocations
-- **Cash Injection Support** - Plan rebalancing with additional funds
-- **Quick Distribution** - One-click even distribution across all holdings
+### 🔐 **Authentication & Security**
+- Supabase authentication
+- Email/password & OAuth
+- Row-level security (RLS)
+- Persistent user portfolios
+- Secure session management
 
-### 🔍 Stock Screener
-- **Advanced Filtering** - Screen stocks by:
-  - Market Capitalization ($B)
-  - P/E Ratio
-  - Dividend Yield (%)
-  - Price Range ($)
-- **48 Popular Stocks** - Screens major stocks across all sectors
-- **Quick Results** - Instant filtering with detailed stock cards
-- **One-Click Add** - Add screened stocks directly to your portfolio
+## 🏗️ Architecture
 
-### 📈 Stock Comparison
-- **Side-by-Side Analysis** - Compare up to 4 stocks simultaneously
-- **Key Metrics Comparison** - Price, P/E, Market Cap, Dividend Yield, Volume, 52W High/Low
-- **Relative Performance Chart** - 30-day percentage change visualization
-- **Color-Coded Display** - Easy identification of each stock
+```
+Frontend (Next.js 16 + React + TypeScript)
+    ↓ HTTPS/REST
+Backend (Python FastAPI)
+    ↓
+┌─────────────┬─────────────┬──────────────┐
+│   ML Models │  Stock Data │  External    │
+│   - Ridge   │  - yfinance │  APIs        │
+│   - Lasso   │  - Cache    │  - Groq AI   │
+│   - RF/GBM  │  - Postgres │  - Finnhub   │
+└─────────────┴─────────────┴──────────────┘
+```
 
-### 🎯 Risk Analysis
-- **Portfolio Correlation Matrix** - Understand how your stocks move together
-  - Pearson correlation coefficients with color-coded heatmap
-  - Diversification score (0-100)
-  - Actionable recommendations for improving diversification
-- **Risk Calculator** - Assess portfolio risk metrics
-- **Volatility Analysis** - Measure and visualize portfolio volatility
-
-### 🤖 Machine Learning Predictions
-- **Price Predictions** - ML-powered 30-day price forecasts
-- **Technical Indicators** - RSI, MACD, Bollinger Bands, Moving Averages
-- **Buy/Hold/Sell Recommendations** - AI-driven trading signals
-- **Confidence Scores** - Understand prediction reliability
-
-### 💬 AI Trading Advisor
-- **Natural Language Interface** - Ask questions in plain English
-- **Portfolio Analysis** - Get insights about your holdings
-- **Stock Research** - Research any stock with AI assistance
-- **Strategy Recommendations** - Receive personalized trading strategies
-
-### 📰 Market Intelligence
-- **Real-Time News** - Latest news for any stock
-- **Technical Analysis Charts** - Interactive price charts with indicators
-- **Fundamental Analysis** - Deep dive into company financials
-- **Watchlist** - Track your favorite stocks with live updates
-- **Price Alerts** - Set custom price alerts (upcoming feature)
-
-## 🛠️ Technology Stack
-
-### Frontend
-- **Next.js 16** - React framework with App Router and Turbopack
-- **TypeScript** - Type-safe development
-- **Tailwind CSS** - Utility-first styling
-- **shadcn/ui** - High-quality React components
-- **Recharts** - Beautiful, composable charts
-- **Sonner** - Toast notifications
-
-### Backend
-- **Next.js API Routes** - Serverless API endpoints
-- **Python Flask** - ML prediction service
-- **Yahoo Finance API** - Real-time market data
-- **TensorFlow/Scikit-learn** - Machine learning models
-
-### Storage
-- **LocalStorage** - Client-side data persistence
-- **Context API** - Global state management
-
-## 📦 Installation
+## 🚀 Quick Start
 
 ### Prerequisites
 - Node.js 18+
-- Python 3.8+
-- npm or yarn
+- Python 3.9+
+- Supabase account (free)
+- API keys: Groq, Finnhub
 
-### Setup
-
-1. **Clone the repository**
+### 1. Clone Repository
 ```bash
-git clone <repository-url>
-cd QuantPilot-fw
+git clone https://github.com/YOUR_USERNAME/QuantPilot.git
+cd QuantPilot
 ```
 
-2. **Install Node.js dependencies**
+### 2. Install Dependencies
 ```bash
-npm install --legacy-peer-deps
-```
+# Frontend
+npm install
 
-3. **Install Python dependencies**
-```bash
-cd ml-service
+# Backend
+cd python-ml-service
 pip install -r requirements.txt
-cd ..
 ```
 
-4. **Set up environment variables**
-Create a `.env.local` file in the root directory:
-```env
-# Add any API keys here if needed
+### 3. Configure Environment
+
+**`.env.local` (root directory):**
+```bash
+PYTHON_ML_SERVICE_URL=http://localhost:8000
+GROQ_API_KEY=your_groq_key
+FINNHUB_API_KEY=your_finnhub_key
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_key
 ```
 
-5. **Start the development servers**
+**`python-ml-service/.env`:**
+```bash
+GROQ_API_KEY=your_groq_key
+FINNHUB_API_KEY=your_finnhub_key
+```
 
-In one terminal, start the Next.js dev server:
+### 4. Set Up Supabase
+
+1. Create project at https://supabase.com
+2. Run migration: Copy `supabase/migrations/20250101000000_initial_schema.sql` to SQL Editor
+3. Get API keys from Settings → API
+
+### 5. Start Services
+
+**Terminal 1 - Python Backend:**
+```bash
+cd python-ml-service
+python app.py
+# Running on http://localhost:8000
+```
+
+**Terminal 2 - Next.js Frontend:**
 ```bash
 npm run dev
+# Running on http://localhost:3000
 ```
 
-In another terminal, start the Python ML service:
-```bash
-cd ml-service
-python app.py
-```
+### 6. Open App
+Navigate to http://localhost:3000 and sign up!
 
-6. **Open the application**
-Navigate to `http://localhost:3000` in your browser.
+## 📚 Documentation
 
-## 📱 User Interface
+- **[Deployment Guide](DEPLOYMENT_GUIDE.md)** - Deploy to Railway + Vercel
+- **[Deployment Checklist](DEPLOYMENT_CHECKLIST.md)** - Pre-deployment checklist
 
-### Main Tabs
-1. **Overview** - Stock search and quick add to portfolio
-2. **Screener** - Advanced stock screening with multiple filters
-3. **Portfolio** - Holdings, performance, dividends, and rebalancing
-4. **Analysis** - Charts, metrics, comparison, risk tools, and news
-5. **ML Predictions** - Machine learning price forecasts
-6. **Account** - Paper trading, transactions, and tax reports
+## 🛠️ Tech Stack
 
-### Portfolio Sub-Tabs
-- **Holdings** - View and manage your stock positions
-- **Performance** - Track portfolio performance over time
-- **Dividends** - Monitor dividend income and projections
-- **Rebalancing** - Calculate optimal portfolio allocations
+### Frontend
+- **Framework:** Next.js 16 (React 19)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS
+- **UI Components:** Radix UI
+- **Charts:** Recharts
+- **State:** React Hooks
 
-### Analysis Sub-Tabs
-- **Charts** - Interactive price charts with technical indicators
-- **Metrics** - In-depth fundamental analysis
-- **Compare** - Side-by-side stock comparison
-- **Risk Tools** - Risk calculator and correlation matrix
-- **News** - Latest market news and updates
+### Backend
+- **Framework:** FastAPI
+- **Language:** Python 3.9+
+- **ML:** scikit-learn, statsmodels
+- **Data:** pandas, numpy, yfinance
+- **Cache:** In-memory with TTL
 
-## 🔧 Configuration
+### Database & Auth
+- **Database:** PostgreSQL (Supabase)
+- **Authentication:** Supabase Auth
+- **Storage:** Supabase Storage
 
-### Polling Intervals
-All real-time data updates every 60 seconds to optimize API usage while maintaining freshness.
+### External APIs
+- **AI:** Groq (llama-3.3-70b-versatile)
+- **News:** Finnhub
+- **Stock Data:** Yahoo Finance (yfinance)
 
-### Data Sources
-- **Stock Quotes** - Yahoo Finance API
-- **Historical Data** - Yahoo Finance historical charts
-- **News** - Yahoo Finance news feed
-- **ML Predictions** - Custom TensorFlow/Scikit-learn models
+## 📊 API Endpoints
 
-## 🎨 Features in Detail
+### Stock Data
+- `POST /quote` - Real-time quotes
+- `POST /historical` - Historical OHLCV
+- `POST /fundamentals` - Company fundamentals
+- `POST /search` - Stock/ETF search
 
-### Stock Screener
-Filter stocks across multiple criteria simultaneously:
-- **Market Cap**: $0B - $10,000B range
-- **P/E Ratio**: 0 - 100 range
-- **Dividend Yield**: 0% - 10% range
-- **Price**: $0 - $1,000 range
+### Technical Analysis
+- `POST /indicators` - Calculate indicators
+- `POST /indicators/timeseries` - Time series data
+- `POST /indicators/signals` - Trading signals
 
-### Correlation Matrix
-Understand portfolio diversification:
-- **Strong Positive (0.7-1.0)**: Red - Stocks move together (higher risk)
-- **Moderate Positive (0.4-0.7)**: Orange - Some similar movement
-- **Weak Positive (0.1-0.4)**: Yellow - Loosely related
-- **No Correlation (-0.1-0.1)**: Gray - Independent movement
-- **Weak Negative (-0.4--0.1)**: Blue - Somewhat opposite
-- **Strong Negative (-1.0--0.4)**: Green - Move opposite (good for diversification)
+### ML & AI
+- `POST /predict` - ML price predictions
+- `POST /features` - Engineered features
+- `POST /ai/chat` - AI assistant
 
-### Rebalancing Calculator
-Optimize your portfolio allocation:
-1. Set target percentages for each holding
-2. Input additional cash to invest (optional)
-3. Calculate exact shares to buy/sell
-4. View current vs target allocation comparison
-5. Execute rebalancing plan
+### Portfolio
+- `POST /recommendations` - Portfolio recommendations
+- `POST /news` - Stock news with sentiment
 
-## 🚀 Performance Optimizations
+## 🚀 Deployment
 
-- **60-second polling** instead of 5-second (92% reduction in API calls)
-- **Error boundaries** for graceful error handling
-- **Toast notifications** for user feedback
-- **Loading states** throughout the application
-- **Responsive design** for all screen sizes
-- **Type-safe development** with TypeScript
+### Production Stack
+- **Frontend:** Vercel (FREE)
+- **Backend:** Railway ($5/month)
+- **Database:** Supabase (FREE tier)
+- **APIs:** Groq & Finnhub (FREE tiers)
 
-## 📊 Data Privacy
+**Total Cost:** ~$5/month
 
-- All portfolio data is stored locally in your browser
-- No data is sent to external servers except for:
-  - Stock quotes from Yahoo Finance
-  - ML predictions from local Python service
-  - AI chat interactions (if enabled)
+See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for detailed instructions.
+
+## 🔐 Security
+
+- ✅ Row-level security (RLS) on all tables
+- ✅ Secure password hashing
+- ✅ HTTP-only cookies
+- ✅ CORS configuration
+- ✅ Environment variable protection
+- ✅ API rate limiting
+
+## 📈 Performance
+
+- **Stock Quotes:** < 500ms
+- **Technical Indicators:** < 1.5s
+- **ML Predictions:** 2-5s (cached)
+- **AI Chat:** 1-3s
+- **News:** < 800ms (10min cache)
 
 ## 🤝 Contributing
 
-This is a personal project, but suggestions and feedback are welcome!
+Contributions welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
 
-## 📄 License
+## 📝 License
 
-This project is for educational and personal use.
+This project is licensed under the MIT License.
+
+## 🆘 Support
+
+- **Issues:** [GitHub Issues](https://github.com/YOUR_USERNAME/QuantPilot/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/YOUR_USERNAME/QuantPilot/discussions)
 
 ## ⚠️ Disclaimer
 
-QuantPilot is for informational purposes only and should not be considered financial advice. Always do your own research and consult with a qualified financial advisor before making investment decisions.
+This software is for educational purposes only. Not financial advice. Trade at your own risk.
 
-- Past performance does not guarantee future results
-- Stock prices and predictions are estimates only
-- Machine learning predictions should be used as one of many tools in your decision-making process
-- The developers are not responsible for any financial losses
+## 🎯 Roadmap
 
-## 🛣️ Roadmap
-
-### Completed ✅
-- [x] Real-time portfolio tracking
-- [x] Stock comparison tool
-- [x] Dividend tracking and projections
-- [x] Portfolio correlation matrix
-- [x] Stock screener with advanced filters
-- [x] Portfolio rebalancing calculator
-- [x] ML price predictions
-- [x] AI trading advisor
-- [x] Paper trading mode
-- [x] Transaction management
-- [x] Tax reporting
-
-### Upcoming Features
-- [ ] Price alerts with notifications
-- [ ] Sector allocation analysis
-- [ ] Options trading analytics
-- [ ] Backtesting strategies
-- [ ] Multi-currency support
+- [ ] Real-time WebSocket updates
+- [ ] Options analysis
+- [ ] Cryptocurrency support
 - [ ] Mobile app (React Native)
-- [ ] Social trading features
-- [ ] Portfolio templates
-
-## 📞 Support
-
-For issues, questions, or feature requests, please open an issue on GitHub.
+- [ ] Advanced charting (TradingView)
+- [ ] Paper trading simulator
+- [ ] Social features
 
 ## 🙏 Acknowledgments
 
-- Built with [Next.js](https://nextjs.org/)
-- UI components from [shadcn/ui](https://ui.shadcn.com/)
-- Charts powered by [Recharts](https://recharts.org/)
-- Data from [Yahoo Finance](https://finance.yahoo.com/)
-- Icons from [Lucide](https://lucide.dev/)
+- **Groq** - Fast LLM inference
+- **Finnhub** - Market data & news
+- **Supabase** - Database & auth
+- **Vercel** - Frontend hosting
+- **Railway** - Backend hosting
 
 ---
 
-**Made with ❤️ for retail investors**
+**Built with ❤️ for traders by traders**
+
+Star ⭐ this repo if you find it useful!

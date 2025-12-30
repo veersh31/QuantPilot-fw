@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { AuthProvider } from '@/contexts/auth-context'
+import { AuthGuard } from '@/components/auth/auth-guard'
 import { Toaster } from 'sonner'
 import './globals.css'
 
@@ -46,9 +47,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider>
-            {children}
-          </AuthProvider>
+          <AuthGuard>
+            <AuthProvider>
+              {children}
+            </AuthProvider>
+          </AuthGuard>
           <Toaster position="top-right" richColors closeButton />
         </ThemeProvider>
         <Analytics />
