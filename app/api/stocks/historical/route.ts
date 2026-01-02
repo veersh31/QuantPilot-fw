@@ -1,4 +1,4 @@
-import { getHistoricalData } from '@/lib/python-service'
+import yahooFinance from '@/lib/yahoo-finance'
 
 export async function POST(request: Request) {
   try {
@@ -8,15 +8,35 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Symbol required' }, { status: 400 })
     }
 
-    console.log('[Historical Data] Fetching from Python service:', symbol, 'Days:', days)
+    console.log('[Historical Data] Fetching from Yahoo Finance:', symbol, 'Days:', days)
 
-    // Proxy to Python service
-    const result = await getHistoricalData(symbol, days)
+    // Calculate date range
+    const endDate = new Date()
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
 
-    // Transform response to match existing format
+    // Fetch historical data from Yahoo Finance
+    const queryOptions = {
+      period1: startDate,
+      period2: endDate,
+      interval: '1d' as const,
+    }
+
+    const result = await yahooFinance.historical(symbol, queryOptions)
+
+    // Transform to match expected format
+    const data = result.map(item => ({
+      date: item.date.toISOString().split('T')[0],
+      open: item.open,
+      high: item.high,
+      low: item.low,
+      close: item.close,
+      volume: item.volume,
+    }))
+
     return Response.json({
-      symbol: result.symbol,
-      data: result.data
+      symbol,
+      data
     })
   } catch (error) {
     console.error('[Historical Data] Error:', error)

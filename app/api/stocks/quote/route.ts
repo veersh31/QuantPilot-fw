@@ -1,4 +1,4 @@
-import { getQuote } from '@/lib/python-service'
+import yahooFinance from '@/lib/yahoo-finance'
 import { stockQuoteRequestSchema } from '@/lib/validations'
 import { ZodError } from 'zod'
 import { logger } from '@/lib/logger'
@@ -12,10 +12,25 @@ export async function POST(request: Request) {
 
     logger.apiRequest('POST', '/api/stocks/quote', { symbol })
 
-    console.log('[Stock Quote] Fetching from Python service:', symbol)
+    console.log('[Stock Quote] Fetching from Yahoo Finance:', symbol)
 
-    // Proxy to Python service
-    const stockData = await getQuote(symbol)
+    // Fetch quote data from Yahoo Finance
+    const quote = await yahooFinance.quote(symbol)
+
+    // Transform to match expected format
+    const stockData = {
+      symbol: quote.symbol,
+      price: quote.regularMarketPrice || 0,
+      change: quote.regularMarketChange || 0,
+      changePercent: quote.regularMarketChangePercent || 0,
+      high52w: quote.fiftyTwoWeekHigh || null,
+      low52w: quote.fiftyTwoWeekLow || null,
+      marketCap: quote.marketCap || null,
+      pe: quote.trailingPE || null,
+      dividendYield: quote.trailingAnnualDividendYield ? quote.trailingAnnualDividendYield * 100 : null,
+      volume: quote.regularMarketVolume || null,
+      avgVolume: quote.averageDailyVolume10Day || quote.averageDailyVolume3Month || null,
+    }
 
     logger.stockFetch(symbol, true)
 

@@ -1,7 +1,5 @@
-import YahooFinance from 'yahoo-finance2'
+import yahooFinance from '@/lib/yahoo-finance'
 import { logger } from '@/lib/logger'
-
-const yahooFinance = new YahooFinance()
 
 export async function POST(request: Request) {
   try {
